@@ -35,7 +35,8 @@
       "expo-camera",
       "expo-image-picker",
       "expo-media-library",
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ],
     "scheme": "artwall",
     "experiments": {

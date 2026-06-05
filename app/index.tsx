@@ -5,61 +5,52 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius, Typography } from '../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { hasOpenAIApiKey } from '../utils/config';
 
-const { width } = Dimensions.get('window');
-
 const STEPS = [
-  { num: '01', label: 'Capture Room', desc: 'Photo or camera' },
-  { num: '02', label: 'AI Cleanup', desc: 'Remove clutter' },
-  { num: '03', label: 'Add Artwork', desc: 'From your library' },
-  { num: '04', label: 'Place & Preview', desc: 'Drag, scale, rotate' },
-  { num: '05', label: 'Save & Share', desc: 'Export your vision' },
+  { num: '01', label: 'Capture room', desc: 'Photo or camera' },
+  { num: '02', label: 'AI cleanup', desc: 'Blank wall preview' },
+  { num: '03', label: 'Add artwork', desc: 'Gallery or samples' },
+  { num: '04', label: 'Place & preview', desc: 'Drag and scale' },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <Text style={styles.brand}>ArtWall</Text>
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => router.push('/settings')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="settings-outline" size={22} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => router.push('/settings')}
-          >
-            <Text style={styles.settingsBtnText}>⚙</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.title}>See art on{'\n'}your wall</Text>
+        <Text style={styles.subtitle}>
+          Capture your space, clean the wall with AI, then preview artwork before you hang it.
+        </Text>
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>AI Art Preview</Text>
-          <Text style={styles.title}>See it{'\n'}on your{'\n'}wall.</Text>
-          <Text style={styles.subtitle}>
-            Visualize any artwork in your space before you buy, print, or hang it.
-          </Text>
-        </View>
-
-        {/* Steps */}
-        <View style={styles.stepsContainer}>
-          {STEPS.map((step, i) => (
+        <View style={styles.steps}>
+          {STEPS.map((step) => (
             <View key={step.num} style={styles.stepRow}>
-              <View style={styles.stepNumContainer}>
-                <Text style={styles.stepNum}>{step.num}</Text>
-                {i < STEPS.length - 1 && <View style={styles.stepLine} />}
-              </View>
-              <View style={styles.stepContent}>
+              <Text style={styles.stepNum}>{step.num}</Text>
+              <View>
                 <Text style={styles.stepLabel}>{step.label}</Text>
                 <Text style={styles.stepDesc}>{step.desc}</Text>
               </View>
@@ -67,52 +58,42 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* API key warning */}
         {!hasOpenAIApiKey() && (
           <TouchableOpacity
             style={styles.warningBanner}
             onPress={() => router.push('/settings')}
           >
             <Text style={styles.warningText}>
-              ⚠ Add EXPO_PUBLIC_OPENAI_API_KEY to .env to enable AI cleanup
+              Add EXPO_PUBLIC_OPENAI_API_KEY to .env for AI cleanup
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* CTA */}
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => router.push('/capture')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.ctaText}>Start Preview</Text>
-        </TouchableOpacity>
+        <PrimaryButton label="Start Preview" onPress={() => router.push('/capture')} />
 
-        <Text style={styles.footer}>
-          Your photos are processed privately and never stored.
-        </Text>
+        <Text style={styles.footer}>Your photos stay on your device.</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  screen: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  scroll: {
-    flex: 1,
-  },
-  container: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing['2xl'],
-  },
-  header: {
+  topBar: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  brand: {
+    fontSize: Typography.sizes.md,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.3,
   },
   settingsBtn: {
     width: 40,
@@ -120,108 +101,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingsBtnText: {
-    fontSize: 22,
-  },
-  hero: {
-    paddingTop: Spacing.lg,
+  container: {
+    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing['2xl'],
-  },
-  eyebrow: {
-    fontSize: Typography.sizes.sm,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: Colors.accentWarm,
-    fontWeight: '600',
-    marginBottom: Spacing.md,
   },
   title: {
     fontSize: Typography.sizes['3xl'],
-    fontWeight: '300',
+    fontWeight: '700',
     color: Colors.text,
-    lineHeight: 44,
-    letterSpacing: -1,
-    marginBottom: Spacing.lg,
+    lineHeight: 40,
+    letterSpacing: -0.5,
+    marginBottom: Spacing.md,
   },
   subtitle: {
     fontSize: Typography.sizes.base,
     color: Colors.textSecondary,
     lineHeight: 24,
-    maxWidth: width * 0.75,
+    marginBottom: Spacing.xl,
   },
-  stepsContainer: {
+  steps: {
+    gap: Spacing.md,
     marginBottom: Spacing.xl,
   },
   stepRow: {
     flexDirection: 'row',
-    marginBottom: 0,
-  },
-  stepNumContainer: {
-    alignItems: 'center',
-    width: 48,
-    marginRight: Spacing.md,
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.borderLight,
   },
   stepNum: {
     fontSize: Typography.sizes.xs,
     fontWeight: '700',
-    color: Colors.accentGold,
-    letterSpacing: 1,
-    width: 28,
-    height: 28,
-    textAlign: 'center',
-    lineHeight: 28,
-  },
-  stepLine: {
-    width: 1,
-    flex: 1,
-    minHeight: 24,
-    backgroundColor: Colors.border,
-    marginVertical: 4,
-  },
-  stepContent: {
-    paddingBottom: Spacing.lg,
-    paddingTop: 4,
+    color: Colors.textMuted,
+    width: 24,
   },
   stepLabel: {
     fontSize: Typography.sizes.base,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: 2,
   },
   stepDesc: {
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
+    marginTop: 2,
   },
   warningBanner: {
-    backgroundColor: '#FEF3E2',
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#F0D9A8',
+    borderColor: Colors.border,
   },
   warningText: {
     fontSize: Typography.sizes.sm,
-    color: '#8B6914',
+    color: Colors.textSecondary,
     lineHeight: 20,
-  },
-  ctaButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    paddingVertical: 18,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  ctaText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.base,
-    fontWeight: '600',
-    letterSpacing: 0.3,
   },
   footer: {
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
     textAlign: 'center',
-    lineHeight: 18,
+    marginTop: Spacing.lg,
   },
 });

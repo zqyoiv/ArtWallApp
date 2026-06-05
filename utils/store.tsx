@@ -9,6 +9,9 @@ export interface ArtworkPlacement {
 }
 
 export interface AppState {
+  roomName: string;
+  setRoomName: (name: string) => void;
+
   roomImageUri: string | null;
   setRoomImageUri: (uri: string | null) => void;
 
@@ -37,6 +40,7 @@ const defaultPlacement: ArtworkPlacement = {
 const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [roomName, setRoomName] = useState('Living Room');
   const [roomImageUri, setRoomImageUri] = useState<string | null>(null);
   const [cleanedRoomUri, setCleanedRoomUri] = useState<string | null>(null);
   const [artworkUri, setArtworkUri] = useState<string | null>(null);
@@ -54,6 +58,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
+        roomName,
+        setRoomName,
         roomImageUri,
         setRoomImageUri,
         cleanedRoomUri,

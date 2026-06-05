@@ -1,25 +1,28 @@
 export const Colors = {
-  background: '#F5F0EB',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceWarm: '#FAF7F4',
-  border: '#E8E0D8',
-  borderDark: '#C8BEB4',
+  surfaceMuted: '#F4F4F5',
+  surfaceWarm: '#FAFAFA',
+  border: '#E4E4E7',
+  borderLight: '#F0F0F2',
 
-  text: '#1A1612',
-  textSecondary: '#6B5F56',
-  textMuted: '#9E9089',
+  text: '#18181B',
+  textSecondary: '#52525B',
+  textMuted: '#A1A1AA',
 
-  accent: '#2D2520',
-  accentWarm: '#8B6F5E',
-  accentGold: '#C4A882',
+  accent: '#18181B',
+  accentMuted: '#71717A',
+  accentWarm: '#52525B',
+  accentGold: '#A1A1AA',
 
-  success: '#4A7C59',
-  error: '#C4544A',
-  overlay: 'rgba(26, 22, 18, 0.5)',
+  success: '#22C55E',
+  error: '#EF4444',
+  overlay: 'rgba(24, 24, 27, 0.45)',
+  placement: 'rgba(255, 255, 255, 0.95)',
 };
 
 export const Typography = {
-  display: 'serif', // will use system serif
+  display: 'System',
   body: 'System',
   sizes: {
     xs: 11,
@@ -29,7 +32,7 @@ export const Typography = {
     lg: 20,
     xl: 24,
     '2xl': 30,
-    '3xl': 38,
+    '3xl': 34,
   },
 };
 
@@ -37,15 +40,25 @@ export const Spacing = {
   xs: 4,
   sm: 8,
   md: 16,
-  lg: 24,
-  xl: 32,
-  '2xl': 48,
+  lg: 20,
+  xl: 24,
+  '2xl': 32,
 };
 
 export const Radius = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
+  xl: 20,
   full: 999,
+};
+
+export const Shadow = {
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
 };

@@ -3,20 +3,26 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Image,
   Alert,
   Dimensions,
   ScrollView,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-import { Colors, Spacing, Radius, Typography } from '../constants/theme';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { ALL_SAMPLE_ARTWORKS } from '../constants/artworks';
 import { useAppStore } from '../utils/store';
 
 const { width } = Dimensions.get('window');
+const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
+
+const SAMPLE_COLORS = Object.fromEntries(
+  ALL_SAMPLE_ARTWORKS.map((a) => [a.id, a.color])
+);
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -28,29 +34,21 @@ export default function ResultScreen() {
       Alert.alert('Permission Denied', 'Photo library write access is required to save.');
       return;
     }
-    try {
-      // In production, use expo-view-shot to capture the composite view as a file URI
-      // then: await MediaLibrary.saveToLibraryAsync(capturedUri);
-      Alert.alert(
-        'Saved! (Demo)',
-        'In the full version, the composite image would be saved to your Camera Roll. ' +
-          'Integrate expo-view-shot to capture the canvas as a real image.',
-        [{ text: 'OK' }]
-      );
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    }
+    Alert.alert(
+      'Saved! (Demo)',
+      'In the full version, the composite image would be saved to your Camera Roll using expo-view-shot.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleShare = async () => {
     try {
-      // In production: share the captured composite URI
       await Share.share({
-        message: 'Check out how this artwork looks on my wall! Preview made with ArtWall app.',
+        message: 'Check out how this artwork looks on my wall! Preview made with ArtWall.',
         title: 'My Artwork Preview',
       });
     } catch {
-      // user cancelled
+      // cancelled
     }
   };
 
@@ -60,23 +58,24 @@ export default function ResultScreen() {
   };
 
   const isSample = artworkUri?.startsWith('sample:');
+  const sampleId = isSample ? artworkUri?.split(':')[1] : null;
+  const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] ?? '#4A6FA5' : '#4A6FA5';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Preview composite */}
+    <View style={styles.screen}>
+      <ScreenHeader title="Your Preview" />
+
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.previewBox}>
           {cleanedRoomUri ? (
-            <Image
-              source={{ uri: cleanedRoomUri }}
-              style={styles.roomImg}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: cleanedRoomUri }} style={styles.roomImg} resizeMode="cover" />
           ) : (
             <View style={styles.roomPlaceholder} />
           )}
 
-          {/* Artwork overlay at saved placement */}
           <View
             style={[
               styles.artworkOverlay,
@@ -93,65 +92,49 @@ export default function ResultScreen() {
             {!isSample && artworkUri ? (
               <Image source={{ uri: artworkUri }} style={styles.artworkImg} resizeMode="contain" />
             ) : (
-              <View style={styles.artworkSample} />
+              <View style={[styles.artworkSample, { backgroundColor: sampleColor }]} />
             )}
           </View>
         </View>
 
-        {/* Note about full save */}
         <View style={styles.noteBanner}>
           <Text style={styles.noteText}>
-            💡 Add <Text style={styles.noteCode}>expo-view-shot</Text> to capture the real composite
-            image. This screen shows a positional approximation of your placement.
+            Add expo-view-shot to export the composite as a single image file.
           </Text>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={handleSaveToLibrary}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryBtnText}>💾 Save to Library</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Text style={styles.secondaryBtnText}>↗ Share</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ghostBtn} onPress={() => router.back()} activeOpacity={0.8}>
-            <Text style={styles.ghostBtnText}>← Adjust Placement</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ghostBtn} onPress={handleStartOver} activeOpacity={0.8}>
-            <Text style={styles.ghostBtnText}>Start Over</Text>
-          </TouchableOpacity>
-        </View>
+        <PrimaryButton label="Save to Library" onPress={handleSaveToLibrary} />
+        <PrimaryButton label="Share" onPress={handleShare} variant="secondary" />
+        <PrimaryButton label="Adjust Placement" onPress={() => router.back()} variant="ghost" />
+        <PrimaryButton label="Start Over" onPress={handleStartOver} variant="ghost" />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
   container: {
     padding: Spacing.lg,
-    gap: Spacing.lg,
+    gap: Spacing.sm,
   },
   previewBox: {
     width: '100%',
-    height: width * 0.75,
-    borderRadius: Radius.lg,
+    height: PREVIEW_HEIGHT,
+    borderRadius: Radius.md,
     overflow: 'hidden',
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.surfaceMuted,
     position: 'relative',
+    marginBottom: Spacing.md,
   },
   roomImg: { width: '100%', height: '100%' },
   roomPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#D8D0C8',
+    backgroundColor: Colors.surfaceMuted,
   },
   artworkOverlay: {
     position: 'absolute',
@@ -159,67 +142,23 @@ const styles = StyleSheet.create({
     left: '25%',
     width: 100,
     height: 75,
-    borderWidth: 5,
-    borderColor: '#D4C5A9',
+    borderWidth: 4,
+    borderColor: '#E8E4DC',
   },
   artworkImg: { width: '100%', height: '100%' },
   artworkSample: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#4A6FA5',
   },
   noteBanner: {
-    backgroundColor: '#EEF4FF',
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: '#C7D9F8',
+    marginBottom: Spacing.md,
   },
   noteText: {
     fontSize: Typography.sizes.sm,
-    color: '#3A5FA0',
+    color: Colors.textSecondary,
     lineHeight: 20,
-  },
-  noteCode: {
-    fontFamily: 'Courier',
-    fontWeight: '700',
-  },
-  actions: {
-    gap: Spacing.sm,
-  },
-  primaryBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: Typography.sizes.base,
-  },
-  secondaryBtn: {
-    backgroundColor: Colors.accentWarm,
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: Typography.sizes.base,
-  },
-  ghostBtn: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  ghostBtnText: {
-    color: Colors.text,
-    fontWeight: '500',
-    fontSize: Typography.sizes.base,
   },
 });

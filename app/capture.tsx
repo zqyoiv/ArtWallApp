@@ -9,14 +9,16 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, Typography } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 
 const { width } = Dimensions.get('window');
-const PREVIEW_HEIGHT = width * 0.75;
+const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
 
 export default function CaptureScreen() {
   const router = useRouter();
@@ -27,10 +29,9 @@ export default function CaptureScreen() {
     if (type === 'camera') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       return status === 'granted';
-    } else {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      return status === 'granted';
     }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    return status === 'granted';
   };
 
   const takePhoto = async () => {
@@ -40,7 +41,7 @@ export default function CaptureScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.92,
       allowsEditing: false,
     });
@@ -56,7 +57,7 @@ export default function CaptureScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.92,
       allowsEditing: false,
     });
@@ -68,20 +69,21 @@ export default function CaptureScreen() {
   const handleContinue = () => {
     if (!previewUri) return;
     setRoomImageUri(previewUri);
-    setCleanedRoomUri(null); // reset any previous cleanup
+    setCleanedRoomUri(null);
     router.push('/cleanup');
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <View style={styles.screen}>
+      <ScreenHeader title="Capture Room" />
+
       <View style={styles.container}>
-        {/* Tips */}
         <View style={styles.tipsBox}>
           <Text style={styles.tipsTitle}>For best results</Text>
           {[
             'Face the wall directly',
-            'Good natural lighting',
-            'Landscape or portrait both work',
+            'Use good natural lighting',
+            'Landscape orientation works best',
           ].map((tip) => (
             <Text key={tip} style={styles.tipItem}>
               · {tip}
@@ -89,64 +91,57 @@ export default function CaptureScreen() {
           ))}
         </View>
 
-        {/* Preview area */}
         <View style={styles.previewContainer}>
           {previewUri ? (
             <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="cover" />
           ) : (
             <View style={styles.previewPlaceholder}>
-              <Text style={styles.placeholderIcon}>🏠</Text>
+              <Ionicons name="home-outline" size={40} color={Colors.textMuted} />
               <Text style={styles.placeholderText}>No photo selected</Text>
             </View>
           )}
         </View>
 
-        {/* Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={takePhoto} activeOpacity={0.8}>
-            <Text style={styles.actionIcon}>📷</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={takePhoto} activeOpacity={0.85}>
+            <Ionicons name="camera-outline" size={28} color={Colors.text} />
             <Text style={styles.actionLabel}>Camera</Text>
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
-          <TouchableOpacity style={styles.actionBtn} onPress={pickFromLibrary} activeOpacity={0.8}>
-            <Text style={styles.actionIcon}>🖼</Text>
-            <Text style={styles.actionLabel}>Library</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={pickFromLibrary} activeOpacity={0.85}>
+            <Ionicons name="images-outline" size={28} color={Colors.text} />
+            <Text style={styles.actionLabel}>Gallery</Text>
           </TouchableOpacity>
         </View>
 
         {previewUri && (
-          <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={handleContinue}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueBtnText}>Use This Photo →</Text>
-          </TouchableOpacity>
+          <PrimaryButton label="Continue" onPress={handleContinue} />
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
   container: {
     flex: 1,
     padding: Spacing.lg,
     gap: Spacing.lg,
   },
   tipsBox: {
-    backgroundColor: Colors.surfaceWarm,
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   tipsTitle: {
     fontSize: Typography.sizes.sm,
-    fontWeight: '700',
+    fontWeight: '600',
     color: Colors.text,
     marginBottom: Spacing.xs,
   },
@@ -158,9 +153,9 @@ const styles = StyleSheet.create({
   previewContainer: {
     width: '100%',
     height: PREVIEW_HEIGHT,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
     overflow: 'hidden',
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.surfaceMuted,
   },
   preview: {
     width: '100%',
@@ -172,7 +167,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
   },
-  placeholderIcon: { fontSize: 48 },
   placeholderText: {
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
@@ -184,6 +178,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
+    ...Shadow.card,
   },
   actionBtn: {
     flex: 1,
@@ -191,26 +186,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     gap: Spacing.xs,
   },
-  actionIcon: { fontSize: 28 },
   actionLabel: {
     fontSize: Typography.sizes.sm,
-    fontWeight: '600',
+    fontWeight: '500',
     color: Colors.text,
   },
   divider: {
     width: 1,
     backgroundColor: Colors.border,
-  },
-  continueBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  continueBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: Typography.sizes.base,
-    letterSpacing: 0.2,
   },
 });

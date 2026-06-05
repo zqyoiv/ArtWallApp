@@ -13,43 +13,18 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: Colors.background },
-            headerTintColor: Colors.text,
-            headerTitleStyle: {
-              fontWeight: '600',
-              fontSize: 17,
-              letterSpacing: -0.3,
-            },
-            headerShadowVisible: false,
+            headerShown: false,
             contentStyle: { backgroundColor: Colors.background },
             animation: 'slide_from_right',
           }}
         >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="capture"
-            options={{ title: 'Capture Room', headerBackTitle: '' }}
-          />
-          <Stack.Screen
-            name="cleanup"
-            options={{ title: 'AI Cleanup', headerBackTitle: '' }}
-          />
-          <Stack.Screen
-            name="artwork"
-            options={{ title: 'Select Artwork', headerBackTitle: '' }}
-          />
-          <Stack.Screen
-            name="place"
-            options={{ title: 'Place Artwork', headerBackTitle: '' }}
-          />
-          <Stack.Screen
-            name="result"
-            options={{ title: 'Your Preview', headerBackTitle: '' }}
-          />
-          <Stack.Screen
-            name="settings"
-            options={{ title: 'Settings', headerBackTitle: '' }}
-          />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="capture" />
+          <Stack.Screen name="cleanup" />
+          <Stack.Screen name="artwork" />
+          <Stack.Screen name="place" />
+          <Stack.Screen name="result" />
+          <Stack.Screen name="settings" />
         </Stack>
       </AppProvider>
     </GestureHandlerRootView>

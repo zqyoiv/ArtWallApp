@@ -1,5 +1,4 @@
 // app/place.tsx
-import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,46 +6,40 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   GestureDetector,
   Gesture,
-  GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   runOnJS,
 } from 'react-native-reanimated';
-import { Colors, Spacing, Radius, Typography } from '../constants/theme';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { ALL_SAMPLE_ARTWORKS } from '../constants/artworks';
 import { useAppStore } from '../utils/store';
 
 const { width } = Dimensions.get('window');
-const CANVAS_HEIGHT = width * (9 / 16); // match 16:9 cleaned room image
-const ARTWORK_SIZE = 120; // initial size
+const CANVAS_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
+const ARTWORK_SIZE = 120;
 
-// Sample colors for demo artworks
-const SAMPLE_COLORS: Record<string, string> = {
-  '1': '#4A6FA5',
-  '2': '#C4856A',
-  '3': '#2D6A4F',
-  '4': '#1A1A1A',
-};
+const SAMPLE_COLORS = Object.fromEntries(
+  ALL_SAMPLE_ARTWORKS.map((a) => [a.id, a.color])
+);
 
 export default function PlaceScreen() {
   const router = useRouter();
-  const { cleanedRoomUri, artworkUri, setPlacement, setFinalImageUri } = useAppStore();
+  const { cleanedRoomUri, artworkUri, roomName, setPlacement, setFinalImageUri } =
+    useAppStore();
 
-  // Gesture shared values
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
-
-  // Track accumulated values for compound gestures
   const savedX = useSharedValue(0);
   const savedY = useSharedValue(0);
   const savedScale = useSharedValue(1);
@@ -61,7 +54,6 @@ export default function PlaceScreen() {
     });
   };
 
-  // Drag gesture
   const drag = Gesture.Pan()
     .onUpdate((e) => {
       translateX.value = savedX.value + e.translationX;
@@ -73,7 +65,6 @@ export default function PlaceScreen() {
       runOnJS(savePlacement)();
     });
 
-  // Pinch gesture
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
       scale.value = Math.max(0.2, Math.min(4, savedScale.value * e.scale));
@@ -83,7 +74,6 @@ export default function PlaceScreen() {
       runOnJS(savePlacement)();
     });
 
-  // Rotate gesture
   const rotate = Gesture.Rotation()
     .onUpdate((e) => {
       rotation.value = savedRotation.value + e.rotation;
@@ -117,31 +107,25 @@ export default function PlaceScreen() {
 
   const handleSavePreview = () => {
     savePlacement();
-    // In production: use ViewShot or expo-gl to capture the composite
-    // For MVP, we'll just pass the URIs and placement to result screen
-    setFinalImageUri(cleanedRoomUri); // placeholder — result screen renders composite
+    setFinalImageUri(cleanedRoomUri);
     router.push('/result');
   };
 
   const isSample = artworkUri?.startsWith('sample:');
   const sampleId = isSample ? artworkUri?.split(':')[1] : null;
-  const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] : '#888';
-
+  const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] ?? '#888' : '#888';
   const backgroundUri = cleanedRoomUri || undefined;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <View style={styles.screen}>
+      <ScreenHeader title={roomName} />
+
       <View style={styles.container}>
-        {/* Instruction */}
-        <View style={styles.instructionBar}>
-          <Text style={styles.instructionText}>
-            Drag · Pinch to resize · Two-finger rotate
-          </Text>
+        <View style={styles.hintBar}>
+          <Text style={styles.hintText}>Drag · Pinch to resize · Two-finger rotate</Text>
         </View>
 
-        {/* Canvas */}
         <View style={styles.canvasWrapper}>
-          {/* Background room */}
           {backgroundUri ? (
             <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="cover" />
           ) : (
@@ -150,7 +134,6 @@ export default function PlaceScreen() {
             </View>
           )}
 
-          {/* Artwork overlay */}
           <GestureDetector gesture={combined}>
             <Animated.View style={[styles.artworkWrapper, artworkStyle]}>
               {isSample ? (
@@ -171,46 +154,46 @@ export default function PlaceScreen() {
           </GestureDetector>
         </View>
 
-        {/* Controls */}
         <View style={styles.controls}>
-          <TouchableOpacity style={styles.resetBtn} onPress={resetPlacement} activeOpacity={0.8}>
-            <Text style={styles.resetBtnText}>↺ Reset</Text>
+          <TouchableOpacity style={styles.resetBtn} onPress={resetPlacement} activeOpacity={0.85}>
+            <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={handleSavePreview}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.saveBtnText}>Save Preview →</Text>
-          </TouchableOpacity>
+          <View style={styles.saveWrap}>
+            <PrimaryButton label="Save Preview" onPress={handleSavePreview} />
+          </View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, gap: Spacing.md, padding: Spacing.md },
-  instructionBar: {
-    backgroundColor: Colors.surfaceWarm,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-  instructionText: {
+  container: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    gap: Spacing.md,
+  },
+  hintBar: {
+    backgroundColor: Colors.surfaceMuted,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+  hintText: {
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
-    letterSpacing: 0.3,
   },
   canvasWrapper: {
     flex: 1,
-    borderRadius: Radius.lg,
+    maxHeight: CANVAS_HEIGHT,
+    borderRadius: Radius.md,
     overflow: 'hidden',
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.surfaceMuted,
     position: 'relative',
   },
   canvas: {
@@ -220,7 +203,6 @@ const styles = StyleSheet.create({
   canvasPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#D8D0C8',
   },
   canvasPlaceholderText: {
     color: Colors.textMuted,
@@ -245,8 +227,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderWidth: 6,
-    borderColor: '#D4C5A9',
+    borderWidth: 4,
+    borderColor: '#E8E4DC',
     borderRadius: 2,
     zIndex: 2,
   },
@@ -262,32 +244,22 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     gap: Spacing.md,
+    alignItems: 'center',
   },
   resetBtn: {
-    flex: 0,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: 16,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    alignItems: 'center',
   },
   resetBtnText: {
     fontSize: Typography.sizes.sm,
     fontWeight: '600',
     color: Colors.text,
   },
-  saveBtn: {
+  saveWrap: {
     flex: 1,
-    paddingVertical: 14,
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: Typography.sizes.base,
   },
 });
