@@ -6,8 +6,6 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { RoomPreview } from '../components/RoomPreview';
 import { SectionHeader } from '../components/SectionHeader';
 import { AddArtButton } from '../components/AddArtButton';
-import { ArtworkCard } from '../components/ArtworkCard';
-import { RECENT_ARTWORKS, SUGGESTED_ARTWORKS } from '../constants/artworks';
 import { Colors, Spacing } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 
@@ -90,41 +88,6 @@ export default function ArtworkScreen() {
             />
           </View>
         </View>
-
-        <View style={styles.listSection}>
-          <SectionHeader title="Recent Adds" actionLabel="View all" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.hList}
-          >
-            {RECENT_ARTWORKS.map((art) => (
-              <ArtworkCard
-                key={art.id}
-                artwork={art}
-                onPress={() => selectArtwork(art.id)}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.listSection}>
-          <SectionHeader title="Suggestions for your space" actionLabel="View all" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.hList}
-          >
-            {SUGGESTED_ARTWORKS.map((art) => (
-              <ArtworkCard
-                key={art.id}
-                artwork={art}
-                variant="suggestion"
-                onPress={() => selectArtwork(art.id)}
-              />
-            ))}
-          </ScrollView>
-        </View>
       </ScrollView>
     </View>
   );
@@ -152,12 +115,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.md,
-  },
-  listSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-  },
-  hList: {
-    paddingRight: Spacing.lg,
   },
 });

@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F5F0EB"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": false,
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F5F0EB"
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "CAMERA",
@@ -39,6 +39,7 @@
       "expo-font"
     ],
     "scheme": "artwall",
+    "newArchEnabled": true,
     "experiments": {
       "typedRoutes": true
     }

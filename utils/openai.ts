@@ -1,6 +1,8 @@
 // utils/openai.ts
 // Room cleanup using OpenAI GPT-Image-1 inpainting
 
+import { Platform } from 'react-native';
+
 const OPENAI_API_URL = 'https://api.openai.com/v1/images/edits';
 
 /** Landscape output size for gpt-image-1 (1536×1024, widescreen). */
@@ -14,32 +16,71 @@ Do not redesign the room or change its layout.
 The output must be a single widescreen 16:9 landscape photograph (horizontal, cinematic aspect ratio). Compose and crop the scene to fill a 16:9 frame edge-to-edge—no square, portrait, or letterboxed framing.
 Return a clean, realistic version of the same space with bare walls ready for new artwork.`;
 
-export async function cleanupRoomImage(
-  imageBase64: string,
-  apiKey: string
-): Promise<string> {
-  const dataUrlMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
-  const mimeType = dataUrlMatch?.[1] || 'image/png';
-  const base64Data = dataUrlMatch?.[2] || imageBase64.split(',')[1] || imageBase64;
+type ImageMime = { mime: string; ext: string };
 
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
+function guessMimeFromUri(uri: string): ImageMime {
+  const lower = uri.split('?')[0].toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
   }
-  const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray], { type: mimeType });
+  if (lower.endsWith('.webp')) {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+  if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
+  }
+  return { mime: 'image/png', ext: 'png' };
+}
 
-  const ext =
-    mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+function mimeToExt(mime: string): string {
+  if (mime === 'image/jpeg') return 'jpg';
+  if (mime === 'image/webp') return 'webp';
+  return 'png';
+}
 
-  const formData = new FormData();
+/** React Native FormData file part (iOS/Android). */
+function appendNativeImage(formData: FormData, uri: string) {
+  const { mime, ext } = guessMimeFromUri(uri);
+  formData.append('image', {
+    uri,
+    type: mime,
+    name: `room.${ext}`,
+  } as unknown as Blob);
+}
+
+/** Web: build Blob via fetch (avoid ArrayBuffer → Blob, unsupported on RN). */
+async function appendWebImage(formData: FormData, source: string) {
+  const response = await fetch(source);
+  const blob = await response.blob();
+  const ext = mimeToExt(blob.type || 'image/png');
   formData.append('image', blob, `room.${ext}`);
+}
+
+async function buildCleanupFormData(imageSource: string): Promise<FormData> {
+  const formData = new FormData();
+
+  if (Platform.OS === 'web') {
+    await appendWebImage(formData, imageSource);
+  } else {
+    appendNativeImage(formData, imageSource);
+  }
+
   formData.append('prompt', CLEANUP_PROMPT);
   formData.append('model', 'gpt-image-1');
   formData.append('n', '1');
   formData.append('size', CLEANUP_IMAGE_SIZE);
-  // gpt-image-1 always returns base64; response_format is only for dall-e-2
+
+  return formData;
+}
+
+/**
+ * @param imageSource Local file URI (iOS/Android) or data URL / blob URL (web)
+ */
+export async function cleanupRoomImage(
+  imageSource: string,
+  apiKey: string
+): Promise<string> {
+  const formData = await buildCleanupFormData(imageSource);
 
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -59,16 +100,4 @@ export async function cleanupRoomImage(
   if (!b64) throw new Error('No image returned from API');
 
   return `data:image/png;base64,${b64}`;
-}
-
-// Convert local file URI to base64
-export async function uriToBase64(uri: string): Promise<string> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }

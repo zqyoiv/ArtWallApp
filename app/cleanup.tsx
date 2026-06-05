@@ -6,7 +6,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { getOpenAIApiKey } from '../utils/config';
 import { useAppStore } from '../utils/store';
-import { cleanupRoomImage, uriToBase64 } from '../utils/openai';
+import { cleanupRoomImage } from '../utils/openai';
 
 export default function CleanupScreen() {
   const router = useRouter();
@@ -36,8 +36,7 @@ export default function CleanupScreen() {
     }
 
     try {
-      const base64 = await uriToBase64(roomImageUri);
-      const cleaned = await cleanupRoomImage(base64, apiKey);
+      const cleaned = await cleanupRoomImage(roomImageUri, apiKey);
       setCleanedRoomUri(cleaned);
       goToArtwork();
     } catch (err: any) {

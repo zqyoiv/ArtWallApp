@@ -2,12 +2,14 @@
 
 AI-powered artwork wall preview app built with Expo + React Native.
 
+**Stack:** Expo SDK 54 · React Native 0.81 · React 19 · Expo Router 6
+
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+ → https://nodejs.org (download LTS)
-- **Expo Go** app on your phone → search "Expo Go" in App Store or Google Play
+- **Node.js** 20+ (LTS recommended) → https://nodejs.org
+- **Expo Go** (latest from App Store / Play Store — must support SDK 54)
 - (Optional) **OpenAI API key** for AI room cleanup
 
 ---

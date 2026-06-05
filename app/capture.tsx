@@ -44,6 +44,8 @@ export default function CaptureScreen() {
       mediaTypes: ['images'],
       quality: 0.92,
       allowsEditing: false,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets[0]) {
       setPreviewUri(result.assets[0].uri);
@@ -60,6 +62,8 @@ export default function CaptureScreen() {
       mediaTypes: ['images'],
       quality: 0.92,
       allowsEditing: false,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets[0]) {
       setPreviewUri(result.assets[0].uri);
