@@ -38,17 +38,6 @@ export default function ArtworkScreen() {
     await pickFromGallery();
   };
 
-  const handleScanWall = () => {
-    Alert.alert(
-      'Scan Wall',
-      'Choose artwork from your gallery to place on the wall.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Choose Photo', onPress: pickFromGallery },
-      ]
-    );
-  };
-
   const handleEditRoom = () => {
     router.push('/capture');
   };
@@ -66,7 +55,7 @@ export default function ArtworkScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <RoomPreview imageUri={cleanedRoomUri} />
+        <RoomPreview imageUri={cleanedRoomUri} showPlacementZone={false} />
 
         <View style={styles.addArtSection}>
           <SectionHeader title="Add Art" />
@@ -80,11 +69,6 @@ export default function ArtworkScreen() {
               label="My Photos"
               icon="image-outline"
               onPress={pickFromPhotos}
-            />
-            <AddArtButton
-              label="Scan Wall"
-              icon="scan-outline"
-              onPress={handleScanWall}
             />
           </View>
         </View>

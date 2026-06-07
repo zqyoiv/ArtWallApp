@@ -15,7 +15,7 @@ type RoomPreviewProps = {
 
 export function RoomPreview({
   imageUri,
-  showPlacementZone = true,
+  showPlacementZone = false,
   widthIn = '60 in',
   heightIn = '40 in',
 }: RoomPreviewProps) {

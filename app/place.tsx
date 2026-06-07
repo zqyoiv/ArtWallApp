@@ -1,4 +1,5 @@
 // app/place.tsx
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,8 +7,10 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { captureRef } from 'react-native-view-shot';
 import {
   GestureDetector,
   Gesture,
@@ -105,16 +108,33 @@ export default function PlaceScreen() {
     savedRotation.value = 0;
   };
 
-  const handleSavePreview = () => {
-    savePlacement();
-    setFinalImageUri(cleanedRoomUri);
-    router.push('/result');
-  };
-
   const isSample = artworkUri?.startsWith('sample:');
   const sampleId = isSample ? artworkUri?.split(':')[1] : null;
   const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] ?? '#888' : '#888';
   const backgroundUri = cleanedRoomUri || undefined;
+  const previewRef = useRef<View>(null);
+  const [capturing, setCapturing] = useState(false);
+
+  const handleSavePreview = async () => {
+    if (!previewRef.current) return;
+    setCapturing(true);
+    try {
+      savePlacement();
+      // Brief delay so transforms are committed before capture
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const uri = await captureRef(previewRef, {
+        format: 'png',
+        quality: 1,
+      });
+      setFinalImageUri(uri);
+      router.push('/result');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not capture preview.';
+      Alert.alert('Capture Failed', message);
+    } finally {
+      setCapturing(false);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -125,28 +145,27 @@ export default function PlaceScreen() {
           <Text style={styles.hintText}>Drag · Pinch to resize · Two-finger rotate</Text>
         </View>
 
-        <View style={styles.canvasWrapper}>
-          {backgroundUri ? (
-            <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="cover" />
-          ) : (
-            <View style={[styles.canvas, styles.canvasPlaceholder]}>
-              <Text style={styles.canvasPlaceholderText}>Room preview</Text>
-            </View>
-          )}
+        <View ref={previewRef} collapsable={false} style={styles.canvasWrapper}>
+          <View style={styles.roomClip}>
+            {backgroundUri ? (
+              <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="cover" />
+            ) : (
+              <View style={[styles.canvas, styles.canvasPlaceholder]}>
+                <Text style={styles.canvasPlaceholderText}>Room preview</Text>
+              </View>
+            )}
+          </View>
 
           <GestureDetector gesture={combined}>
             <Animated.View style={[styles.artworkWrapper, artworkStyle]}>
               {isSample ? (
-                <View style={[styles.sampleArtwork, { backgroundColor: sampleColor }]}>
-                  <View style={styles.artworkFrame} />
-                </View>
+                <View style={[styles.artworkShadowBox, { backgroundColor: sampleColor }]} />
               ) : artworkUri ? (
-                <View style={styles.artworkImageWrapper}>
-                  <View style={styles.artworkFrame} />
+                <View style={styles.artworkShadowBox}>
                   <Image
                     source={{ uri: artworkUri }}
                     style={styles.artworkImage}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 </View>
               ) : null}
@@ -159,7 +178,12 @@ export default function PlaceScreen() {
             <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
           <View style={styles.saveWrap}>
-            <PrimaryButton label="Save Preview" onPress={handleSavePreview} />
+            <PrimaryButton
+              label="Save Preview"
+              onPress={handleSavePreview}
+              loading={capturing}
+              disabled={capturing}
+            />
           </View>
         </View>
       </View>
@@ -192,9 +216,13 @@ const styles = StyleSheet.create({
     flex: 1,
     maxHeight: CANVAS_HEIGHT,
     borderRadius: Radius.md,
-    overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,
     position: 'relative',
+  },
+  roomClip: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
   },
   canvas: {
     width: '100%',
@@ -215,31 +243,21 @@ const styles = StyleSheet.create({
     width: ARTWORK_SIZE,
     height: ARTWORK_SIZE * 0.75,
   },
-  sampleArtwork: {
+  artworkShadowBox: {
     width: '100%',
     height: '100%',
     borderRadius: 2,
-    padding: 8,
-  },
-  artworkFrame: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderWidth: 4,
-    borderColor: '#E8E4DC',
-    borderRadius: 2,
-    zIndex: 2,
-  },
-  artworkImageWrapper: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 10, height: 10 },
+    shadowOpacity: 0.38,
+    shadowRadius: 14,
+    elevation: 12,
   },
   artworkImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 2,
   },
   controls: {
     flexDirection: 'row',

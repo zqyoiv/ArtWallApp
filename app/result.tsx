@@ -1,54 +1,80 @@
 // app/result.tsx
+import { useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Image,
   Alert,
   Dimensions,
   ScrollView,
-  Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { Colors, Radius, Spacing, Typography } from '../constants/theme';
-import { ALL_SAMPLE_ARTWORKS } from '../constants/artworks';
+import { Colors, Radius, Spacing } from '../constants/theme';
 import { useAppStore } from '../utils/store';
+import { saveImageToCameraRoll } from '../utils/saveToLibrary';
 
 const { width } = Dimensions.get('window');
 const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
 
-const SAMPLE_COLORS = Object.fromEntries(
-  ALL_SAMPLE_ARTWORKS.map((a) => [a.id, a.color])
-);
-
 export default function ResultScreen() {
   const router = useRouter();
-  const { cleanedRoomUri, artworkUri, placement, reset } = useAppStore();
+  const { finalImageUri, reset } = useAppStore();
+  const previewRef = useRef<View>(null);
+  const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const resolveCaptureUri = async (): Promise<string | null> => {
+    if (finalImageUri) {
+      return finalImageUri;
+    }
+    if (!previewRef.current) {
+      return null;
+    }
+    return captureRef(previewRef, { format: 'png', quality: 1 });
+  };
 
   const handleSaveToLibrary = async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Photo library write access is required to save.');
-      return;
+    setSaving(true);
+    try {
+      const uri = await resolveCaptureUri();
+      if (!uri) {
+        Alert.alert('Nothing to save', 'Go back and tap Save Preview on the placement screen.');
+        return;
+      }
+      await saveImageToCameraRoll(uri);
+      Alert.alert('Saved', 'Your preview was added to Photos.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not save to Photos.';
+      Alert.alert('Save Failed', message);
+    } finally {
+      setSaving(false);
     }
-    Alert.alert(
-      'Saved! (Demo)',
-      'In the full version, the composite image would be saved to your Camera Roll using expo-view-shot.',
-      [{ text: 'OK' }]
-    );
   };
 
   const handleShare = async () => {
+    setSharing(true);
     try {
-      await Share.share({
-        message: 'Check out how this artwork looks on my wall! Preview made with ArtWall.',
-        title: 'My Artwork Preview',
+      const uri = await resolveCaptureUri();
+      if (!uri) {
+        Alert.alert('Nothing to share', 'Go back and tap Save Preview on the placement screen.');
+        return;
+      }
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share your wall preview',
       });
     } catch {
-      // cancelled
+      // user cancelled or share failed silently
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -57,9 +83,16 @@ export default function ResultScreen() {
     router.dismissAll();
   };
 
-  const isSample = artworkUri?.startsWith('sample:');
-  const sampleId = isSample ? artworkUri?.split(':')[1] : null;
-  const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] ?? '#4A6FA5' : '#4A6FA5';
+  if (!finalImageUri) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title="Your Preview" />
+        <View style={styles.fallback}>
+          <PrimaryButton label="Adjust Placement" onPress={() => router.back()} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -69,42 +102,23 @@ export default function ResultScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.previewBox}>
-          {cleanedRoomUri ? (
-            <Image source={{ uri: cleanedRoomUri }} style={styles.roomImg} resizeMode="cover" />
-          ) : (
-            <View style={styles.roomPlaceholder} />
-          )}
-
-          <View
-            style={[
-              styles.artworkOverlay,
-              {
-                transform: [
-                  { translateX: placement.x },
-                  { translateY: placement.y },
-                  { scale: placement.scale },
-                  { rotate: `${placement.rotation}rad` },
-                ],
-              },
-            ]}
-          >
-            {!isSample && artworkUri ? (
-              <Image source={{ uri: artworkUri }} style={styles.artworkImg} resizeMode="contain" />
-            ) : (
-              <View style={[styles.artworkSample, { backgroundColor: sampleColor }]} />
-            )}
-          </View>
+        <View ref={previewRef} collapsable={false} style={styles.previewBox}>
+          <Image source={{ uri: finalImageUri }} style={styles.previewImage} resizeMode="cover" />
         </View>
 
-        <View style={styles.noteBanner}>
-          <Text style={styles.noteText}>
-            Add expo-view-shot to export the composite as a single image file.
-          </Text>
-        </View>
-
-        <PrimaryButton label="Save to Library" onPress={handleSaveToLibrary} />
-        <PrimaryButton label="Share" onPress={handleShare} variant="secondary" />
+        <PrimaryButton
+          label="Save to Photos"
+          onPress={handleSaveToLibrary}
+          loading={saving}
+          disabled={saving || sharing}
+        />
+        <PrimaryButton
+          label="Share"
+          onPress={handleShare}
+          variant="secondary"
+          loading={sharing}
+          disabled={saving || sharing}
+        />
         <PrimaryButton label="Adjust Placement" onPress={() => router.back()} variant="ghost" />
         <PrimaryButton label="Start Over" onPress={handleStartOver} variant="ghost" />
       </ScrollView>
@@ -121,44 +135,21 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     gap: Spacing.sm,
   },
+  fallback: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
   previewBox: {
     width: '100%',
     height: PREVIEW_HEIGHT,
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,
-    position: 'relative',
     marginBottom: Spacing.md,
   },
-  roomImg: { width: '100%', height: '100%' },
-  roomPlaceholder: {
+  previewImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: Colors.surfaceMuted,
-  },
-  artworkOverlay: {
-    position: 'absolute',
-    top: '25%',
-    left: '25%',
-    width: 100,
-    height: 75,
-    borderWidth: 4,
-    borderColor: '#E8E4DC',
-  },
-  artworkImg: { width: '100%', height: '100%' },
-  artworkSample: {
-    width: '100%',
-    height: '100%',
-  },
-  noteBanner: {
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  noteText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
   },
 });
