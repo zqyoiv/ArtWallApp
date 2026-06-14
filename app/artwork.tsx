@@ -1,17 +1,20 @@
 // app/artwork.tsx — main screen after AI cleanup
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { RoomPreview } from '../components/RoomPreview';
 import { SectionHeader } from '../components/SectionHeader';
 import { AddArtButton } from '../components/AddArtButton';
-import { Colors, Spacing } from '../constants/theme';
+import { Colors, Spacing, Typography } from '../constants/theme';
 import { useAppStore } from '../utils/store';
+import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 
 export default function ArtworkScreen() {
   const router = useRouter();
   const { cleanedRoomUri, roomName, setArtworkUri } = useAppStore();
+  const [processingImage, setProcessingImage] = useState(false);
 
   const selectArtwork = (id: string, uri?: string) => {
     setArtworkUri(uri ?? `sample:${id}`);
@@ -19,6 +22,7 @@ export default function ArtworkScreen() {
   };
 
   const pickFromGallery = async () => {
+    if (processingImage) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Photo library access is required.');
@@ -28,9 +32,22 @@ export default function ArtworkScreen() {
       mediaTypes: ['images'],
       quality: 1,
       allowsEditing: false,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets[0]) {
-      selectArtwork('custom', result.assets[0].uri);
+      setProcessingImage(true);
+      try {
+        const uri = await normalizeImageForOpenAI(
+          result.assets[0].uri,
+          result.assets[0].mimeType
+        );
+        selectArtwork('custom', uri);
+      } catch {
+        Alert.alert('Image Error', 'Could not process this photo. Please try another image.');
+      } finally {
+        setProcessingImage(false);
+      }
     }
   };
 
@@ -71,6 +88,12 @@ export default function ArtworkScreen() {
               onPress={pickFromPhotos}
             />
           </View>
+          {processingImage ? (
+            <View style={styles.processingRow}>
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+              <Text style={styles.processingText}>Processing photo…</Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -99,5 +122,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.md,
+  },
+  processingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  processingText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
   },
 });

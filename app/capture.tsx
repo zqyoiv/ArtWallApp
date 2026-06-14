@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,6 +17,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme';
 import { useAppStore } from '../utils/store';
+import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 
 const { width } = Dimensions.get('window');
 const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
@@ -24,6 +26,19 @@ export default function CaptureScreen() {
   const router = useRouter();
   const { setRoomImageUri, setCleanedRoomUri } = useAppStore();
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+
+  const applyPickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    setProcessingImage(true);
+    try {
+      const uri = await normalizeImageForOpenAI(asset.uri, asset.mimeType);
+      setPreviewUri(uri);
+    } catch {
+      Alert.alert('Image Error', 'Could not process this photo. Please try another image.');
+    } finally {
+      setProcessingImage(false);
+    }
+  };
 
   const requestPermission = async (type: 'camera' | 'library') => {
     if (type === 'camera') {
@@ -48,7 +63,7 @@ export default function CaptureScreen() {
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets[0]) {
-      setPreviewUri(result.assets[0].uri);
+      await applyPickedImage(result.assets[0]);
     }
   };
 
@@ -66,7 +81,7 @@ export default function CaptureScreen() {
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets[0]) {
-      setPreviewUri(result.assets[0].uri);
+      await applyPickedImage(result.assets[0]);
     }
   };
 
@@ -96,7 +111,12 @@ export default function CaptureScreen() {
         </View>
 
         <View style={styles.previewContainer}>
-          {previewUri ? (
+          {processingImage ? (
+            <View style={styles.previewPlaceholder}>
+              <ActivityIndicator size="large" color={Colors.textMuted} />
+              <Text style={styles.placeholderText}>Processing photo…</Text>
+            </View>
+          ) : previewUri ? (
             <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="cover" />
           ) : (
             <View style={styles.previewPlaceholder}>
@@ -120,7 +140,7 @@ export default function CaptureScreen() {
           </TouchableOpacity>
         </View>
 
-        {previewUri && (
+        {previewUri && !processingImage && (
           <PrimaryButton label="Continue" onPress={handleContinue} />
         )}
       </View>

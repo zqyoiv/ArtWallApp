@@ -24,6 +24,9 @@ export interface AppState {
   placement: ArtworkPlacement;
   setPlacement: (p: ArtworkPlacement) => void;
 
+  aiLayoutEnabled: boolean;
+  setAiLayoutEnabled: (enabled: boolean) => void;
+
   finalImageUri: string | null;
   setFinalImageUri: (uri: string | null) => void;
 
@@ -45,6 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [cleanedRoomUri, setCleanedRoomUri] = useState<string | null>(null);
   const [artworkUri, setArtworkUri] = useState<string | null>(null);
   const [placement, setPlacement] = useState<ArtworkPlacement>(defaultPlacement);
+  const [aiLayoutEnabled, setAiLayoutEnabled] = useState(true);
   const [finalImageUri, setFinalImageUri] = useState<string | null>(null);
 
   const reset = () => {
@@ -52,6 +56,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCleanedRoomUri(null);
     setArtworkUri(null);
     setPlacement(defaultPlacement);
+    setAiLayoutEnabled(true);
     setFinalImageUri(null);
   };
 
@@ -68,6 +73,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setArtworkUri,
         placement,
         setPlacement,
+        aiLayoutEnabled,
+        setAiLayoutEnabled,
         finalImageUri,
         setFinalImageUri,
         reset,
