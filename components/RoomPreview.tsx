@@ -1,10 +1,10 @@
-import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
-
-const { width } = Dimensions.get('window');
-const H_PADDING = Spacing.lg;
-const PREVIEW_WIDTH = width - H_PADDING * 2;
-const PREVIEW_HEIGHT = PREVIEW_WIDTH * (9 / 16);
+import { View, Text, Image, StyleSheet } from 'react-native';
+import { Colors } from '../constants/theme';
+import {
+  ROOM_PREVIEW_WIDTH,
+  roomPreviewHeightForAspect,
+  useImageAspectRatio,
+} from '../utils/useImageAspectRatio';
 
 type RoomPreviewProps = {
   imageUri: string | null;
@@ -19,10 +19,13 @@ export function RoomPreview({
   widthIn = '60 in',
   heightIn = '40 in',
 }: RoomPreviewProps) {
+  const aspectRatio = useImageAspectRatio(imageUri);
+  const previewHeight = roomPreviewHeightForAspect(aspectRatio);
+
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { height: previewHeight }]}>
       {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>Room preview</Text>
@@ -41,12 +44,11 @@ export function RoomPreview({
   );
 }
 
-export const ROOM_PREVIEW_HEIGHT = PREVIEW_HEIGHT;
+export const ROOM_PREVIEW_HEIGHT = roomPreviewHeightForAspect(16 / 9);
 
 const styles = StyleSheet.create({
   wrapper: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
+    width: ROOM_PREVIEW_WIDTH,
     alignSelf: 'center',
     borderRadius: 4,
     overflow: 'hidden',

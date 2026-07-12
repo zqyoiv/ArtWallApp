@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,9 +18,12 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme'
 import { useAppStore } from '../utils/store';
 import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 import { DEBUG_WALL_ESTIMATE } from '../utils/dimensions';
+import {
+  ROOM_PREVIEW_WIDTH,
+  roomPreviewHeightForAspect,
+  useImageAspectRatio,
+} from '../utils/useImageAspectRatio';
 
-const { width } = Dimensions.get('window');
-const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
 const DEBUG_ROOM_SOURCE = require('../assets/test-room/02_couch_cleaned.jpg');
 
 export default function CaptureScreen() {
@@ -29,6 +31,8 @@ export default function CaptureScreen() {
   const { debugMode, setRoomImageUri, setCleanedRoomUri, setWallEstimate } = useAppStore();
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [processingImage, setProcessingImage] = useState(false);
+  const previewAspect = useImageAspectRatio(previewUri);
+  const previewHeight = roomPreviewHeightForAspect(previewAspect, ROOM_PREVIEW_WIDTH);
 
   const applyPickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setProcessingImage(true);
@@ -105,7 +109,7 @@ export default function CaptureScreen() {
     setRoomImageUri(resolved.uri);
     setCleanedRoomUri(resolved.uri);
     setWallEstimate(DEBUG_WALL_ESTIMATE);
-    router.replace('/artwork');
+    router.push('/artwork');
   };
 
   return (
@@ -136,14 +140,14 @@ export default function CaptureScreen() {
           </View>
         )}
 
-        <View style={styles.previewContainer}>
+        <View style={[styles.previewContainer, { height: previewHeight }]}>
           {processingImage ? (
             <View style={styles.previewPlaceholder}>
               <ActivityIndicator size="large" color={Colors.textMuted} />
               <Text style={styles.placeholderText}>Processing photo…</Text>
             </View>
           ) : previewUri ? (
-            <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="cover" />
+            <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="contain" />
           ) : (
             <View style={styles.previewPlaceholder}>
               <Ionicons name="home-outline" size={40} color={Colors.textMuted} />
@@ -218,7 +222,6 @@ const styles = StyleSheet.create({
   },
   previewContainer: {
     width: '100%',
-    height: PREVIEW_HEIGHT,
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,

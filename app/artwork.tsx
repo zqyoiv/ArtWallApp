@@ -14,7 +14,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme';
 import { GALLERY_ARTWORKS, type GalleryArtwork } from '../constants/gallery';
 import { useAppStore } from '../utils/store';
-import { parseInchesSize } from '../utils/dimensions';
+import { parseArtworkInchesSize } from '../utils/dimensions';
 
 export default function ArtworkScreen() {
   const router = useRouter();
@@ -24,20 +24,15 @@ export default function ArtworkScreen() {
     const resolved = Image.resolveAssetSource(artwork.image);
     if (!resolved?.uri) return;
     setArtworkUri(resolved.uri);
-    setArtworkSizeInches(parseInchesSize(artwork.dimensionsIn));
+    setArtworkSizeInches(parseArtworkInchesSize(artwork.dimensionsIn));
     router.push('/place');
-  };
-
-  const handleEditRoom = () => {
-    router.push('/capture');
   };
 
   return (
     <View style={styles.screen}>
       <ScreenHeader
         title={roomName}
-        rightLabel="Edit Room"
-        onRightPress={handleEditRoom}
+        onBackPress={() => router.dismissTo('/capture')}
       />
 
       <ScrollView

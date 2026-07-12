@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Image,
   Alert,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,9 +15,11 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Spacing } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 import { saveImageToCameraRoll } from '../utils/saveToLibrary';
-
-const { width } = Dimensions.get('window');
-const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
+import {
+  ROOM_PREVIEW_WIDTH,
+  roomPreviewHeightForAspect,
+  useImageAspectRatio,
+} from '../utils/useImageAspectRatio';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -26,6 +27,8 @@ export default function ResultScreen() {
   const previewRef = useRef<View>(null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const previewAspect = useImageAspectRatio(finalImageUri);
+  const previewHeight = roomPreviewHeightForAspect(previewAspect, ROOM_PREVIEW_WIDTH);
 
   const resolveCaptureUri = async (): Promise<string | null> => {
     if (finalImageUri) {
@@ -102,8 +105,12 @@ export default function ResultScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <View ref={previewRef} collapsable={false} style={styles.previewBox}>
-          <Image source={{ uri: finalImageUri }} style={styles.previewImage} resizeMode="cover" />
+        <View
+          ref={previewRef}
+          collapsable={false}
+          style={[styles.previewBox, { height: previewHeight }]}
+        >
+          <Image source={{ uri: finalImageUri }} style={styles.previewImage} resizeMode="contain" />
         </View>
 
         <PrimaryButton
@@ -142,7 +149,6 @@ const styles = StyleSheet.create({
   },
   previewBox: {
     width: '100%',
-    height: PREVIEW_HEIGHT,
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,

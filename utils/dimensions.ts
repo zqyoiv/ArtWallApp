@@ -25,8 +25,21 @@ export const DEBUG_WALL_ESTIMATE: WallEstimate = {
 };
 
 /**
- * Parse strings like `84" × 66"`, `30 x 24 in`, `12 x 12 x 2 in`.
- * Uses the first two numbers as width × height (inches).
+ * Parse gallery artwork size strings like `30 x 24 in`, `12 x 12 x 2 in`.
+ * CSV convention: first number is height, second is width (inches).
+ * Depth (third number) is ignored when present.
+ */
+export function parseArtworkInchesSize(raw: string): SizeInches | null {
+  const matches = raw.match(/(\d+(?:\.\d+)?)/g);
+  if (!matches || matches.length < 2) return null;
+  const heightInches = Number(matches[0]);
+  const widthInches = Number(matches[1]);
+  if (!widthInches || !heightInches) return null;
+  return { widthInches, heightInches };
+}
+
+/**
+ * Parse wall size strings like `84" × 66"` as width × height (inches).
  */
 export function parseInchesSize(raw: string): SizeInches | null {
   const matches = raw.match(/(\d+(?:\.\d+)?)/g);

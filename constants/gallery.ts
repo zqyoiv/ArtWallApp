@@ -10,17 +10,10 @@ export type GalleryArtwork = {
   image: ImageSourcePropType;
 };
 
-/** Love to Hate test gallery — mirrors assets/test-gallery/love-to-hate.csv */
+/** Love to Hate test gallery — mirrors assets/test-gallery/love-to-hate.csv.
+ * dimensionsIn uses height × width (inches), matching the CSV.
+ * Ordered small → large by area (height × width). */
 export const GALLERY_ARTWORKS: GalleryArtwork[] = [
-  {
-    id: 'pedro-pedro-blue-cheese',
-    artist: 'Pedro Pedro',
-    year: '2026',
-    title: 'Blue Cheese',
-    medium: 'Acrylic and textile paint on linen',
-    dimensionsIn: '30 x 24 in',
-    image: require('../assets/test-gallery/pedro_pedro-blue_cheese.png'),
-  },
   {
     id: 'tania-alvarez-pool',
     artist: 'Tania Alvarez',
@@ -31,13 +24,22 @@ export const GALLERY_ARTWORKS: GalleryArtwork[] = [
     image: require('../assets/test-gallery/tania_alvarez-pool.png'),
   },
   {
-    id: 'tj-rinoski-deep-end',
-    artist: 'TJ Rinoski',
-    year: '2023',
-    title: 'Deep End',
-    medium: 'Oil on canvas',
-    dimensionsIn: '54 x 72 in',
-    image: require('../assets/test-gallery/tj-rinoski_deep-end.png'),
+    id: 'kevin-christy-boogeyman',
+    artist: 'Kevin Christy',
+    year: '2026',
+    title: 'Boogeyman',
+    medium: 'Oil on canvas with artist frame',
+    dimensionsIn: '24 x 20 in',
+    image: require('../assets/test-gallery/kevin-christy_boogeyman.png'),
+  },
+  {
+    id: 'pedro-pedro-blue-cheese',
+    artist: 'Pedro Pedro',
+    year: '2026',
+    title: 'Blue Cheese',
+    medium: 'Acrylic and textile paint on linen',
+    dimensionsIn: '30 x 24 in',
+    image: require('../assets/test-gallery/pedro_pedro-blue_cheese.png'),
   },
   {
     id: 'jake-sheiner-ipickle',
@@ -49,15 +51,6 @@ export const GALLERY_ARTWORKS: GalleryArtwork[] = [
     image: require('../assets/test-gallery/jake-sheiner_ipickle.png'),
   },
   {
-    id: 'avery-wheless-last-call',
-    artist: 'Avery Wheless',
-    year: '2026',
-    title: 'Last Call',
-    medium: 'Oil on canvas',
-    dimensionsIn: '54 x 42 in',
-    image: require('../assets/test-gallery/avery-wheless_last-call.png'),
-  },
-  {
     id: 'austin-hayman-nothing-to-wear',
     artist: 'Austin Hayman',
     year: '2026',
@@ -65,6 +58,15 @@ export const GALLERY_ARTWORKS: GalleryArtwork[] = [
     medium: 'Oil on canvas',
     dimensionsIn: '44 x 44 in',
     image: require('../assets/test-gallery/austin-hayman_nothing-to-wear.png'),
+  },
+  {
+    id: 'avery-wheless-last-call',
+    artist: 'Avery Wheless',
+    year: '2026',
+    title: 'Last Call',
+    medium: 'Oil on canvas',
+    dimensionsIn: '54 x 42 in',
+    image: require('../assets/test-gallery/avery-wheless_last-call.png'),
   },
   {
     id: 'ari-salka-the-work-of-ambivalence',

@@ -6,9 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { captureRef } from 'react-native-view-shot';
@@ -23,32 +21,27 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { SettingToggle } from '../components/SettingToggle';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import {
   ARTWORK_BASE_WIDTH,
-  CANVAS_ASPECT_RATIO,
   PLACEMENT_ANCHOR_LEFT,
   PLACEMENT_ANCHOR_TOP,
 } from '../constants/placement';
 import { ALL_SAMPLE_ARTWORKS } from '../constants/artworks';
 import { useAppStore, ArtworkPlacement } from '../utils/store';
-import { suggestArtworkLayout } from '../utils/openai';
-import { getOpenAIApiKey, hasOpenAIApiKey } from '../utils/config';
 import { getImageDimensions } from '../utils/imageUtils';
 import {
   DEFAULT_WALL_ESTIMATE,
   formatInchesSize,
 } from '../utils/dimensions';
+import { trueScaleArtworkSize } from '../utils/placementLayout';
 import {
-  placementFromAiSuggestion,
-  trueScaleArtworkSize,
-  trueScaleWidthFraction,
-} from '../utils/placementLayout';
+  ROOM_PREVIEW_WIDTH,
+  roomPreviewHeightForAspect,
+  useImageAspectRatio,
+} from '../utils/useImageAspectRatio';
 
-const { width } = Dimensions.get('window');
-const CANVAS_WIDTH = width - Spacing.lg * 2;
-const CANVAS_HEIGHT = CANVAS_WIDTH / CANVAS_ASPECT_RATIO;
+const CANVAS_WIDTH = ROOM_PREVIEW_WIDTH;
 const DEFAULT_ARTWORK_ASPECT = 4 / 3;
 
 const SAMPLE_COLORS = Object.fromEntries(
@@ -72,13 +65,13 @@ export default function PlaceScreen() {
     artworkSizeInches,
     wallEstimate,
     roomName,
-    aiLayoutEnabled,
-    setAiLayoutEnabled,
     setPlacement,
     setFinalImageUri,
   } = useAppStore();
 
   const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
+  const roomAspectRatio = useImageAspectRatio(cleanedRoomUri);
+  const canvasHeight = roomPreviewHeightForAspect(roomAspectRatio);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -90,7 +83,6 @@ export default function PlaceScreen() {
   const savedRotation = useSharedValue(0);
 
   const [artworkAspectRatio, setArtworkAspectRatio] = useState(DEFAULT_ARTWORK_ASPECT);
-  const [aiLayoutLoading, setAiLayoutLoading] = useState(false);
 
   const trueScaleSize = useMemo(() => {
     if (!artworkSizeInches) return null;
@@ -100,7 +92,6 @@ export default function PlaceScreen() {
   const baseArtworkWidth = trueScaleSize?.width ?? ARTWORK_BASE_WIDTH;
   const artworkHeight =
     trueScaleSize?.height ?? baseArtworkWidth / artworkAspectRatio;
-  const effectiveAspect = trueScaleSize?.aspectRatio ?? artworkAspectRatio;
 
   const savePlacement = () => {
     setPlacement({
@@ -217,57 +208,6 @@ export default function PlaceScreen() {
     };
   }, [artworkUri, artworkSizeInches, isSample, sampleArtwork]);
 
-  const handleAiLayout = async () => {
-    if (!backgroundUri) {
-      Alert.alert('Room Missing', 'Add a cleaned room photo before using AI layout.');
-      return;
-    }
-
-    if (!hasOpenAIApiKey()) {
-      Alert.alert(
-        'API Key Required',
-        'Add EXPO_PUBLIC_OPENAI_API_KEY in .env to use AI layout suggestions.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    setAiLayoutLoading(true);
-    try {
-      const targetWidthFraction = artworkSizeInches
-        ? trueScaleWidthFraction(artworkSizeInches, wall)
-        : undefined;
-
-      const sizeNote = artworkSizeInches
-        ? ` Artwork size ${formatInchesSize(artworkSizeInches)}. Blank wall ~${formatInchesSize(wall)}.`
-        : '';
-
-      const suggestion = await suggestArtworkLayout({
-        roomUri: backgroundUri,
-        artworkUri: isSample ? null : artworkUri,
-        artworkAspectRatio: effectiveAspect,
-        artworkDescription: sampleArtwork
-          ? `Sample artwork titled "${sampleArtwork.title}" (${sampleArtwork.dimensions}).${sizeNote}`
-          : sizeNote || undefined,
-        targetWidthFraction,
-        apiKey: getOpenAIApiKey(),
-      });
-
-      const placement = placementFromAiSuggestion(
-        suggestion,
-        CANVAS_WIDTH,
-        baseArtworkWidth,
-        effectiveAspect
-      );
-      applyPlacement(placement);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not suggest a layout.';
-      Alert.alert('AI Layout Failed', message);
-    } finally {
-      setAiLayoutLoading(false);
-    }
-  };
-
   const handleSavePreview = async () => {
     if (!previewRef.current) return;
     setCapturing(true);
@@ -293,22 +233,6 @@ export default function PlaceScreen() {
       <ScreenHeader title={roomName} />
 
       <View style={styles.container}>
-        <SettingToggle
-          label="Use AI layout"
-          value={aiLayoutEnabled}
-          onValueChange={setAiLayoutEnabled}
-          disabled={aiLayoutLoading}
-        />
-
-        {aiLayoutEnabled ? (
-          <PrimaryButton
-            label="Let AI Decide Layout"
-            onPress={handleAiLayout}
-            loading={aiLayoutLoading}
-            disabled={aiLayoutLoading || capturing}
-          />
-        ) : null}
-
         <View style={styles.hintBar}>
           <Text style={styles.hintText}>
             {artworkSizeInches
@@ -317,23 +241,20 @@ export default function PlaceScreen() {
           </Text>
         </View>
 
-        <View ref={previewRef} collapsable={false} style={styles.canvasWrapper}>
+        <View
+          ref={previewRef}
+          collapsable={false}
+          style={[styles.canvasWrapper, { height: canvasHeight }]}
+        >
           <View style={styles.roomClip}>
             {backgroundUri ? (
-              <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="cover" />
+              <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="contain" />
             ) : (
               <View style={[styles.canvas, styles.canvasPlaceholder]}>
                 <Text style={styles.canvasPlaceholderText}>Room preview</Text>
               </View>
             )}
           </View>
-
-          {aiLayoutLoading ? (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.loadingText}>Finding the best spot…</Text>
-            </View>
-          ) : null}
 
           <GestureDetector gesture={combined}>
             <View
@@ -371,7 +292,7 @@ export default function PlaceScreen() {
               label="Save Preview"
               onPress={handleSavePreview}
               loading={capturing}
-              disabled={capturing || aiLayoutLoading}
+              disabled={capturing}
             />
           </View>
         </View>
@@ -404,11 +325,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   canvasWrapper: {
-    flex: 1,
-    maxHeight: CANVAS_HEIGHT,
+    width: '100%',
     borderRadius: Radius.md,
     backgroundColor: Colors.surfaceMuted,
     position: 'relative',
+    overflow: 'hidden',
   },
   roomClip: {
     ...StyleSheet.absoluteFillObject,
@@ -427,20 +348,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    zIndex: 2,
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.sm,
-    fontWeight: '500',
-  },
   artworkAnchor: {
     position: 'absolute',
     top: `${PLACEMENT_ANCHOR_TOP * 100}%`,
@@ -453,7 +360,7 @@ const styles = StyleSheet.create({
   artworkShadowBox: {
     width: '100%',
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 0,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000000',
     shadowOffset: { width: 10, height: 10 },
@@ -464,7 +371,7 @@ const styles = StyleSheet.create({
   artworkImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 0,
   },
   controls: {
     flexDirection: 'row',

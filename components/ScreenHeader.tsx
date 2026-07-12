@@ -4,13 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
-/** Equal-width side slots keep the title visually centered. */
-const SIDE_SLOT_WIDTH = 88;
-
 type ScreenHeaderProps = {
   title: string;
   rightLabel?: string;
   onRightPress?: () => void;
+  onBackPress?: () => void;
   showBack?: boolean;
 };
 
@@ -18,19 +16,27 @@ export function ScreenHeader({
   title,
   rightLabel,
   onRightPress,
+  onBackPress,
   showBack = true,
 }: ScreenHeaderProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const handleBack = () => {
+    if (onBackPress) {
+      onBackPress();
+      return;
+    }
+    router.back();
+  };
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + Spacing.sm }]}>
       <View style={styles.row}>
-        <View style={styles.sideSlot}>
+        <View style={styles.side}>
           {showBack ? (
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => router.back()}
+              onPress={handleBack}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons name="chevron-back" size={24} color={Colors.text} />
@@ -38,16 +44,18 @@ export function ScreenHeader({
           ) : null}
         </View>
 
-        <Text style={styles.title} numberOfLines={1} pointerEvents="none">
-          {title}
-        </Text>
+        <View style={styles.center}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
 
-        <View style={[styles.sideSlot, styles.sideSlotRight]}>
+        <View style={[styles.side, styles.sideRight]}>
           {rightLabel ? (
             <TouchableOpacity
               onPress={onRightPress}
               disabled={!onRightPress}
-              style={styles.rightBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.rightAction} numberOfLines={1}>
                 {rightLabel}
@@ -72,32 +80,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 40,
-    position: 'relative',
+    gap: Spacing.sm,
   },
-  sideSlot: {
-    width: SIDE_SLOT_WIDTH,
-    zIndex: 1,
+  side: {
+    flex: 1,
     justifyContent: 'center',
   },
-  sideSlotRight: {
+  sideRight: {
     alignItems: 'flex-end',
+  },
+  center: {
+    flexShrink: 1,
+    maxWidth: '46%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backBtn: {
     alignSelf: 'flex-start',
   },
-  rightBtn: {
-    alignSelf: 'flex-end',
-  },
   title: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
     fontSize: Typography.sizes.md,
     fontWeight: '600',
     color: Colors.text,
     letterSpacing: -0.3,
-    paddingHorizontal: SIDE_SLOT_WIDTH,
+    textAlign: 'center',
   },
   rightAction: {
     fontSize: Typography.sizes.sm,

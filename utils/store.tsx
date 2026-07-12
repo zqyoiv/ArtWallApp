@@ -31,9 +31,6 @@ export interface AppState {
   placement: ArtworkPlacement;
   setPlacement: (p: ArtworkPlacement) => void;
 
-  aiLayoutEnabled: boolean;
-  setAiLayoutEnabled: (enabled: boolean) => void;
-
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
 
@@ -60,7 +57,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [artworkUri, setArtworkUri] = useState<string | null>(null);
   const [artworkSizeInches, setArtworkSizeInches] = useState<SizeInches | null>(null);
   const [placement, setPlacement] = useState<ArtworkPlacement>(defaultPlacement);
-  const [aiLayoutEnabled, setAiLayoutEnabled] = useState(true);
   const [debugMode, setDebugMode] = useState(false);
   const [finalImageUri, setFinalImageUri] = useState<string | null>(null);
 
@@ -71,7 +67,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setArtworkUri(null);
     setArtworkSizeInches(null);
     setPlacement(defaultPlacement);
-    setAiLayoutEnabled(true);
     setFinalImageUri(null);
   };
 
@@ -92,8 +87,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setArtworkSizeInches,
         placement,
         setPlacement,
-        aiLayoutEnabled,
-        setAiLayoutEnabled,
         debugMode,
         setDebugMode,
         finalImageUri,
