@@ -27,6 +27,9 @@ export interface AppState {
   aiLayoutEnabled: boolean;
   setAiLayoutEnabled: (enabled: boolean) => void;
 
+  debugMode: boolean;
+  setDebugMode: (enabled: boolean) => void;
+
   finalImageUri: string | null;
   setFinalImageUri: (uri: string | null) => void;
 
@@ -49,6 +52,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [artworkUri, setArtworkUri] = useState<string | null>(null);
   const [placement, setPlacement] = useState<ArtworkPlacement>(defaultPlacement);
   const [aiLayoutEnabled, setAiLayoutEnabled] = useState(true);
+  const [debugMode, setDebugMode] = useState(false);
   const [finalImageUri, setFinalImageUri] = useState<string | null>(null);
 
   const reset = () => {
@@ -75,6 +79,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPlacement,
         aiLayoutEnabled,
         setAiLayoutEnabled,
+        debugMode,
+        setDebugMode,
         finalImageUri,
         setFinalImageUri,
         reset,

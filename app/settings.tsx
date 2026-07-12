@@ -1,8 +1,10 @@
 // app/settings.tsx
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { SettingToggle } from '../components/SettingToggle';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { getOpenAIApiKey, hasOpenAIApiKey } from '../utils/config';
+import { useAppStore } from '../utils/store';
 
 function maskApiKey(key: string): string {
   if (key.length <= 11) return '••••••••';
@@ -12,6 +14,7 @@ function maskApiKey(key: string): string {
 export default function SettingsScreen() {
   const apiKey = getOpenAIApiKey();
   const configured = hasOpenAIApiKey();
+  const { debugMode, setDebugMode } = useAppStore();
 
   return (
     <View style={styles.screen}>
@@ -21,6 +24,14 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Debug</Text>
+          <Text style={styles.sectionDesc}>
+            Skip AI room cleanup and use a built-in cleaned test room photo on Capture Room.
+          </Text>
+          <SettingToggle label="Debug" value={debugMode} onValueChange={setDebugMode} />
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>OpenAI API Key</Text>
           <Text style={styles.sectionDesc}>

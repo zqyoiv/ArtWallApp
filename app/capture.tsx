@@ -21,10 +21,11 @@ import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 
 const { width } = Dimensions.get('window');
 const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
+const DEBUG_ROOM_SOURCE = require('../assets/test-room/02_couch_cleaned.jpg');
 
 export default function CaptureScreen() {
   const router = useRouter();
-  const { setRoomImageUri, setCleanedRoomUri } = useAppStore();
+  const { debugMode, setRoomImageUri, setCleanedRoomUri } = useAppStore();
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [processingImage, setProcessingImage] = useState(false);
 
@@ -92,23 +93,45 @@ export default function CaptureScreen() {
     router.push('/cleanup');
   };
 
+  const useDebugRoom = () => {
+    const resolved = Image.resolveAssetSource(DEBUG_ROOM_SOURCE);
+    if (!resolved?.uri) {
+      Alert.alert('Debug Error', 'Could not load the debug room image.');
+      return;
+    }
+    setPreviewUri(resolved.uri);
+    setRoomImageUri(resolved.uri);
+    setCleanedRoomUri(resolved.uri);
+    router.replace('/artwork');
+  };
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Capture Room" />
 
       <View style={styles.container}>
-        <View style={styles.tipsBox}>
-          <Text style={styles.tipsTitle}>For best results</Text>
-          {[
-            'Face the wall directly',
-            'Use good natural lighting',
-            'Landscape orientation works best',
-          ].map((tip) => (
-            <Text key={tip} style={styles.tipItem}>
-              · {tip}
+        {debugMode ? (
+          <View style={styles.debugBox}>
+            <Text style={styles.debugTitle}>Debug mode</Text>
+            <Text style={styles.debugDesc}>
+              Use the built-in cleaned test room and skip AI cleanup.
             </Text>
-          ))}
-        </View>
+            <PrimaryButton label="Use Debug Room" onPress={useDebugRoom} />
+          </View>
+        ) : (
+          <View style={styles.tipsBox}>
+            <Text style={styles.tipsTitle}>For best results</Text>
+            {[
+              'Face the wall directly',
+              'Use good natural lighting',
+              'Landscape orientation works best',
+            ].map((tip) => (
+              <Text key={tip} style={styles.tipItem}>
+                · {tip}
+              </Text>
+            ))}
+          </View>
+        )}
 
         <View style={styles.previewContainer}>
           {processingImage ? (
@@ -162,6 +185,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.md,
+  },
+  debugBox: {
+    backgroundColor: Colors.surfaceMuted,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  debugTitle: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  debugDesc: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: 22,
   },
   tipsTitle: {
     fontSize: Typography.sizes.sm,
