@@ -1,5 +1,5 @@
 // app/place.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -36,7 +36,15 @@ import { useAppStore, ArtworkPlacement } from '../utils/store';
 import { suggestArtworkLayout } from '../utils/openai';
 import { getOpenAIApiKey, hasOpenAIApiKey } from '../utils/config';
 import { getImageDimensions } from '../utils/imageUtils';
-import { artworkHeightForAspect, placementFromAiSuggestion } from '../utils/placementLayout';
+import {
+  DEFAULT_WALL_ESTIMATE,
+  formatInchesSize,
+} from '../utils/dimensions';
+import {
+  placementFromAiSuggestion,
+  trueScaleArtworkSize,
+  trueScaleWidthFraction,
+} from '../utils/placementLayout';
 
 const { width } = Dimensions.get('window');
 const CANVAS_WIDTH = width - Spacing.lg * 2;
@@ -61,12 +69,16 @@ export default function PlaceScreen() {
   const {
     cleanedRoomUri,
     artworkUri,
+    artworkSizeInches,
+    wallEstimate,
     roomName,
     aiLayoutEnabled,
     setAiLayoutEnabled,
     setPlacement,
     setFinalImageUri,
   } = useAppStore();
+
+  const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -79,6 +91,16 @@ export default function PlaceScreen() {
 
   const [artworkAspectRatio, setArtworkAspectRatio] = useState(DEFAULT_ARTWORK_ASPECT);
   const [aiLayoutLoading, setAiLayoutLoading] = useState(false);
+
+  const trueScaleSize = useMemo(() => {
+    if (!artworkSizeInches) return null;
+    return trueScaleArtworkSize(artworkSizeInches, wall, CANVAS_WIDTH);
+  }, [artworkSizeInches, wall]);
+
+  const baseArtworkWidth = trueScaleSize?.width ?? ARTWORK_BASE_WIDTH;
+  const artworkHeight =
+    trueScaleSize?.height ?? baseArtworkWidth / artworkAspectRatio;
+  const effectiveAspect = trueScaleSize?.aspectRatio ?? artworkAspectRatio;
 
   const savePlacement = () => {
     setPlacement({
@@ -154,12 +176,16 @@ export default function PlaceScreen() {
   const backgroundUri = cleanedRoomUri || undefined;
   const previewRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
-  const artworkHeight = artworkHeightForAspect(artworkAspectRatio);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadAspectRatio() {
+      if (artworkSizeInches) {
+        setArtworkAspectRatio(artworkSizeInches.widthInches / artworkSizeInches.heightInches);
+        return;
+      }
+
       if (!artworkUri) {
         setArtworkAspectRatio(DEFAULT_ARTWORK_ASPECT);
         return;
@@ -189,7 +215,7 @@ export default function PlaceScreen() {
     return () => {
       cancelled = true;
     };
-  }, [artworkUri, isSample, sampleArtwork]);
+  }, [artworkUri, artworkSizeInches, isSample, sampleArtwork]);
 
   const handleAiLayout = async () => {
     if (!backgroundUri) {
@@ -208,17 +234,31 @@ export default function PlaceScreen() {
 
     setAiLayoutLoading(true);
     try {
+      const targetWidthFraction = artworkSizeInches
+        ? trueScaleWidthFraction(artworkSizeInches, wall)
+        : undefined;
+
+      const sizeNote = artworkSizeInches
+        ? ` Artwork size ${formatInchesSize(artworkSizeInches)}. Blank wall ~${formatInchesSize(wall)}.`
+        : '';
+
       const suggestion = await suggestArtworkLayout({
         roomUri: backgroundUri,
         artworkUri: isSample ? null : artworkUri,
-        artworkAspectRatio,
+        artworkAspectRatio: effectiveAspect,
         artworkDescription: sampleArtwork
-          ? `Sample artwork titled "${sampleArtwork.title}" (${sampleArtwork.dimensions}).`
-          : undefined,
+          ? `Sample artwork titled "${sampleArtwork.title}" (${sampleArtwork.dimensions}).${sizeNote}`
+          : sizeNote || undefined,
+        targetWidthFraction,
         apiKey: getOpenAIApiKey(),
       });
 
-      const placement = placementFromAiSuggestion(suggestion, CANVAS_WIDTH, artworkAspectRatio);
+      const placement = placementFromAiSuggestion(
+        suggestion,
+        CANVAS_WIDTH,
+        baseArtworkWidth,
+        effectiveAspect
+      );
       applyPlacement(placement);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not suggest a layout.';
@@ -270,7 +310,11 @@ export default function PlaceScreen() {
         ) : null}
 
         <View style={styles.hintBar}>
-          <Text style={styles.hintText}>Drag · Pinch to resize · Two-finger rotate</Text>
+          <Text style={styles.hintText}>
+            {artworkSizeInches
+              ? `True scale · Art ${formatInchesSize(artworkSizeInches)} on wall ~${formatInchesSize(wall)}`
+              : 'Drag · Pinch to resize · Two-finger rotate'}
+          </Text>
         </View>
 
         <View ref={previewRef} collapsable={false} style={styles.canvasWrapper}>
@@ -296,7 +340,7 @@ export default function PlaceScreen() {
               style={[
                 styles.artworkAnchor,
                 {
-                  width: ARTWORK_BASE_WIDTH,
+                  width: baseArtworkWidth,
                   height: artworkHeight,
                 },
               ]}
@@ -351,11 +395,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     alignItems: 'center',
   },
   hintText: {
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
   canvasWrapper: {
     flex: 1,

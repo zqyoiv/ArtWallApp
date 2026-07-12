@@ -18,6 +18,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 import { normalizeImageForOpenAI } from '../utils/normalizeImage';
+import { DEBUG_WALL_ESTIMATE } from '../utils/dimensions';
 
 const { width } = Dimensions.get('window');
 const PREVIEW_HEIGHT = (width - Spacing.lg * 2) * (9 / 16);
@@ -25,7 +26,7 @@ const DEBUG_ROOM_SOURCE = require('../assets/test-room/02_couch_cleaned.jpg');
 
 export default function CaptureScreen() {
   const router = useRouter();
-  const { debugMode, setRoomImageUri, setCleanedRoomUri } = useAppStore();
+  const { debugMode, setRoomImageUri, setCleanedRoomUri, setWallEstimate } = useAppStore();
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [processingImage, setProcessingImage] = useState(false);
 
@@ -90,6 +91,7 @@ export default function CaptureScreen() {
     if (!previewUri) return;
     setRoomImageUri(previewUri);
     setCleanedRoomUri(null);
+    setWallEstimate(null);
     router.push('/cleanup');
   };
 
@@ -102,6 +104,7 @@ export default function CaptureScreen() {
     setPreviewUri(resolved.uri);
     setRoomImageUri(resolved.uri);
     setCleanedRoomUri(resolved.uri);
+    setWallEstimate(DEBUG_WALL_ESTIMATE);
     router.replace('/artwork');
   };
 

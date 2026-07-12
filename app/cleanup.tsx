@@ -5,14 +5,27 @@ import { useRouter } from 'expo-router';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { getOpenAIApiKey } from '../utils/config';
+import { DEFAULT_WALL_ESTIMATE } from '../utils/dimensions';
 import { useAppStore } from '../utils/store';
-import { cleanupRoomImage } from '../utils/openai';
+import { cleanupRoomImage, estimateBlankWallDimensions } from '../utils/openai';
 
 export default function CleanupScreen() {
   const router = useRouter();
-  const { roomImageUri, cleanedRoomUri, setCleanedRoomUri } = useAppStore();
+  const {
+    roomImageUri,
+    cleanedRoomUri,
+    setCleanedRoomUri,
+    setWallEstimate,
+  } = useAppStore();
 
   const goToArtwork = () => router.replace('/artwork');
+
+  const skipWithOriginal = () => {
+    if (!roomImageUri) return;
+    setCleanedRoomUri(roomImageUri);
+    setWallEstimate(DEFAULT_WALL_ESTIMATE);
+    goToArtwork();
+  };
 
   const runCleanup = async () => {
     if (!roomImageUri) return;
@@ -23,32 +36,24 @@ export default function CleanupScreen() {
         'Add EXPO_PUBLIC_OPENAI_API_KEY to your .env file, then restart the dev server.',
         [
           { text: 'Settings', onPress: () => router.push('/settings') },
-          {
-            text: 'Skip (use original)',
-            onPress: () => {
-              setCleanedRoomUri(roomImageUri);
-              goToArtwork();
-            },
-          },
+          { text: 'Skip (use original)', onPress: skipWithOriginal },
         ]
       );
       return;
     }
 
     try {
-      const cleaned = await cleanupRoomImage(roomImageUri, apiKey);
+      const [cleaned, wall] = await Promise.all([
+        cleanupRoomImage(roomImageUri, apiKey),
+        estimateBlankWallDimensions(roomImageUri, apiKey).catch(() => DEFAULT_WALL_ESTIMATE),
+      ]);
       setCleanedRoomUri(cleaned);
+      setWallEstimate(wall);
       goToArtwork();
     } catch (err: any) {
       Alert.alert('Cleanup Failed', err.message || 'Something went wrong.', [
         { text: 'Retry', onPress: runCleanup },
-        {
-          text: 'Skip (use original)',
-          onPress: () => {
-            setCleanedRoomUri(roomImageUri);
-            goToArtwork();
-          },
-        },
+        { text: 'Skip (use original)', onPress: skipWithOriginal },
       ]);
     }
   };
@@ -68,7 +73,8 @@ export default function CleanupScreen() {
         <ActivityIndicator size="large" color={Colors.text} style={styles.spinner} />
         <Text style={styles.title}>Cleaning up your room</Text>
         <Text style={styles.desc}>
-          Removing clutter and wall art so you can preview new pieces on a blank wall.
+          Removing clutter and wall art, and estimating the blank wall size for true-to-scale
+          artwork previews.
         </Text>
         <Text style={styles.hint}>This usually takes 15–30 seconds</Text>
       </View>

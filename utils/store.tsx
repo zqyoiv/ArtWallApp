@@ -1,5 +1,6 @@
 // utils/store.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { SizeInches, WallEstimate } from './dimensions';
 
 export interface ArtworkPlacement {
   x: number;
@@ -18,8 +19,14 @@ export interface AppState {
   cleanedRoomUri: string | null;
   setCleanedRoomUri: (uri: string | null) => void;
 
+  wallEstimate: WallEstimate | null;
+  setWallEstimate: (wall: WallEstimate | null) => void;
+
   artworkUri: string | null;
   setArtworkUri: (uri: string | null) => void;
+
+  artworkSizeInches: SizeInches | null;
+  setArtworkSizeInches: (size: SizeInches | null) => void;
 
   placement: ArtworkPlacement;
   setPlacement: (p: ArtworkPlacement) => void;
@@ -49,7 +56,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [roomName, setRoomName] = useState('Living Room');
   const [roomImageUri, setRoomImageUri] = useState<string | null>(null);
   const [cleanedRoomUri, setCleanedRoomUri] = useState<string | null>(null);
+  const [wallEstimate, setWallEstimate] = useState<WallEstimate | null>(null);
   const [artworkUri, setArtworkUri] = useState<string | null>(null);
+  const [artworkSizeInches, setArtworkSizeInches] = useState<SizeInches | null>(null);
   const [placement, setPlacement] = useState<ArtworkPlacement>(defaultPlacement);
   const [aiLayoutEnabled, setAiLayoutEnabled] = useState(true);
   const [debugMode, setDebugMode] = useState(false);
@@ -58,7 +67,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reset = () => {
     setRoomImageUri(null);
     setCleanedRoomUri(null);
+    setWallEstimate(null);
     setArtworkUri(null);
+    setArtworkSizeInches(null);
     setPlacement(defaultPlacement);
     setAiLayoutEnabled(true);
     setFinalImageUri(null);
@@ -73,8 +84,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRoomImageUri,
         cleanedRoomUri,
         setCleanedRoomUri,
+        wallEstimate,
+        setWallEstimate,
         artworkUri,
         setArtworkUri,
+        artworkSizeInches,
+        setArtworkSizeInches,
         placement,
         setPlacement,
         aiLayoutEnabled,
