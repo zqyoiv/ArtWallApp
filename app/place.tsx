@@ -187,6 +187,7 @@ export default function PlaceScreen() {
     wallEstimate,
     roomName,
     setFinalImageUri,
+    reset,
   } = useAppStore();
 
   const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
@@ -394,6 +395,11 @@ export default function PlaceScreen() {
       .finally(() => setCapturing(false));
   };
 
+  const handleStartOver = () => {
+    reset();
+    router.replace('/');
+  };
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title={roomName} />
@@ -489,6 +495,7 @@ export default function PlaceScreen() {
             )}
           </View>
         </View>
+        <PrimaryButton label="Start Over" onPress={handleStartOver} variant="ghost" />
       </View>
     </View>
   );

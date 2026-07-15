@@ -184,7 +184,7 @@ export default function ResultScreen() {
 
   const handleStartOver = () => {
     reset();
-    router.dismissAll();
+    router.replace('/');
   };
 
   if (!finalImageUri) {
