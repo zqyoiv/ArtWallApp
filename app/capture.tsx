@@ -18,6 +18,7 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/theme'
 import { useAppStore } from '../utils/store';
 import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 import { DEBUG_WALL_ESTIMATE } from '../utils/dimensions';
+import { resolveAssetUri } from '../utils/imageUtils';
 import {
   ROOM_PREVIEW_WIDTH,
   roomPreviewHeightForAspect,
@@ -99,17 +100,24 @@ export default function CaptureScreen() {
     router.push('/cleanup');
   };
 
-  const useDebugRoom = () => {
-    const resolved = Image.resolveAssetSource(DEBUG_ROOM_SOURCE);
-    if (!resolved?.uri) {
+  const useDebugRoom = async () => {
+    setProcessingImage(true);
+    try {
+      const uri = await resolveAssetUri(DEBUG_ROOM_SOURCE);
+      if (!uri) {
+        Alert.alert('Debug Error', 'Could not load the debug room image.');
+        return;
+      }
+      setPreviewUri(uri);
+      setRoomImageUri(uri);
+      setCleanedRoomUri(uri);
+      setWallEstimate(DEBUG_WALL_ESTIMATE);
+      router.push('/artwork');
+    } catch {
       Alert.alert('Debug Error', 'Could not load the debug room image.');
-      return;
+    } finally {
+      setProcessingImage(false);
     }
-    setPreviewUri(resolved.uri);
-    setRoomImageUri(resolved.uri);
-    setCleanedRoomUri(resolved.uri);
-    setWallEstimate(DEBUG_WALL_ESTIMATE);
-    router.push('/artwork');
   };
 
   return (
@@ -123,7 +131,12 @@ export default function CaptureScreen() {
             <Text style={styles.debugDesc}>
               Use the built-in cleaned test room and skip AI cleanup.
             </Text>
-            <PrimaryButton label="Use Debug Room" onPress={useDebugRoom} />
+            <PrimaryButton
+              label="Use Debug Room"
+              onPress={useDebugRoom}
+              loading={processingImage}
+              disabled={processingImage}
+            />
           </View>
         ) : (
           <View style={styles.tipsBox}>

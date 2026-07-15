@@ -1,13 +1,27 @@
 // utils/store.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { ImageSourcePropType } from 'react-native';
 import { SizeInches, WallEstimate } from './dimensions';
 
 export interface ArtworkPlacement {
+  /** Absolute left on the room canvas (px). */
   x: number;
+  /** Absolute top on the room canvas (px). */
   y: number;
   scale: number;
   rotation: number;
 }
+
+export type SelectedArtwork = {
+  id: string;
+  /** Bundled asset source — preferred for rendering (works on web + native). */
+  image: ImageSourcePropType;
+  /** Resolved URI when available (optional fallback). */
+  uri?: string | null;
+  title: string;
+  sizeInches: SizeInches;
+  placement: ArtworkPlacement;
+};
 
 export interface AppState {
   roomName: string;
@@ -22,14 +36,9 @@ export interface AppState {
   wallEstimate: WallEstimate | null;
   setWallEstimate: (wall: WallEstimate | null) => void;
 
-  artworkUri: string | null;
-  setArtworkUri: (uri: string | null) => void;
-
-  artworkSizeInches: SizeInches | null;
-  setArtworkSizeInches: (size: SizeInches | null) => void;
-
-  placement: ArtworkPlacement;
-  setPlacement: (p: ArtworkPlacement) => void;
+  selectedArtworks: SelectedArtwork[];
+  setSelectedArtworks: (artworks: SelectedArtwork[]) => void;
+  updateArtworkPlacement: (id: string, placement: ArtworkPlacement) => void;
 
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
@@ -40,13 +49,6 @@ export interface AppState {
   reset: () => void;
 }
 
-const defaultPlacement: ArtworkPlacement = {
-  x: 0,
-  y: 0,
-  scale: 1,
-  rotation: 0,
-};
-
 const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -54,19 +56,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [roomImageUri, setRoomImageUri] = useState<string | null>(null);
   const [cleanedRoomUri, setCleanedRoomUri] = useState<string | null>(null);
   const [wallEstimate, setWallEstimate] = useState<WallEstimate | null>(null);
-  const [artworkUri, setArtworkUri] = useState<string | null>(null);
-  const [artworkSizeInches, setArtworkSizeInches] = useState<SizeInches | null>(null);
-  const [placement, setPlacement] = useState<ArtworkPlacement>(defaultPlacement);
+  const [selectedArtworks, setSelectedArtworks] = useState<SelectedArtwork[]>([]);
   const [debugMode, setDebugMode] = useState(false);
   const [finalImageUri, setFinalImageUri] = useState<string | null>(null);
+
+  const updateArtworkPlacement = (id: string, placement: ArtworkPlacement) => {
+    setSelectedArtworks((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, placement } : item))
+    );
+  };
 
   const reset = () => {
     setRoomImageUri(null);
     setCleanedRoomUri(null);
     setWallEstimate(null);
-    setArtworkUri(null);
-    setArtworkSizeInches(null);
-    setPlacement(defaultPlacement);
+    setSelectedArtworks([]);
     setFinalImageUri(null);
   };
 
@@ -81,12 +85,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCleanedRoomUri,
         wallEstimate,
         setWallEstimate,
-        artworkUri,
-        setArtworkUri,
-        artworkSizeInches,
-        setArtworkSizeInches,
-        placement,
-        setPlacement,
+        selectedArtworks,
+        setSelectedArtworks,
+        updateArtworkPlacement,
         debugMode,
         setDebugMode,
         finalImageUri,

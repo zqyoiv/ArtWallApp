@@ -1,5 +1,5 @@
-// app/place.tsx
-import { useEffect, useMemo, useRef, useState } from 'react';
+// app/place.tsx — arrange one or more artworks on the cleaned room wall
+import { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { captureRef } from 'react-native-view-shot';
+import { Ionicons } from '@expo/vector-icons';
 import {
   GestureDetector,
   Gesture,
@@ -23,18 +24,18 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import {
-  ARTWORK_BASE_WIDTH,
-  PLACEMENT_ANCHOR_LEFT,
-  PLACEMENT_ANCHOR_TOP,
-} from '../constants/placement';
-import { ALL_SAMPLE_ARTWORKS } from '../constants/artworks';
-import { useAppStore, ArtworkPlacement } from '../utils/store';
-import { getImageDimensions } from '../utils/imageUtils';
+  useAppStore,
+  type ArtworkPlacement,
+  type SelectedArtwork,
+} from '../utils/store';
 import {
   DEFAULT_WALL_ESTIMATE,
   formatInchesSize,
 } from '../utils/dimensions';
-import { trueScaleArtworkSize } from '../utils/placementLayout';
+import {
+  layoutArtworksNonOverlapping,
+  trueScaleArtworkSize,
+} from '../utils/placementLayout';
 import {
   ROOM_PREVIEW_WIDTH,
   roomPreviewHeightForAspect,
@@ -42,177 +43,198 @@ import {
 } from '../utils/useImageAspectRatio';
 
 const CANVAS_WIDTH = ROOM_PREVIEW_WIDTH;
-const DEFAULT_ARTWORK_ASPECT = 4 / 3;
+const TRASH_SIZE = 44;
+const TRASH_PADDING = 10;
+/** Hit area around the trash icon for delete-on-drop. */
+const TRASH_HIT_RADIUS = 56;
 
-const SAMPLE_COLORS = Object.fromEntries(
-  ALL_SAMPLE_ARTWORKS.map((a) => [a.id, a.color])
-);
+function isOverTrashZone(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  scale: number,
+  canvasHeight: number
+): boolean {
+  const scaledW = width * scale;
+  const scaledH = height * scale;
+  const centerX = left + scaledW / 2;
+  const centerY = top + scaledH / 2;
+  const trashCenterX = TRASH_PADDING + TRASH_SIZE / 2;
+  const trashCenterY = canvasHeight - TRASH_PADDING - TRASH_SIZE / 2;
+  return Math.hypot(centerX - trashCenterX, centerY - trashCenterY) <= TRASH_HIT_RADIUS;
+}
 
-function parseDimensionsAspect(dimensions: string): number | null {
-  const match = dimensions.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/i);
-  if (!match) return null;
-  const w = Number(match[1]);
-  const h = Number(match[2]);
-  if (!w || !h) return null;
-  return w / h;
+type PlaceableProps = {
+  artwork: SelectedArtwork;
+  width: number;
+  height: number;
+  canvasHeight: number;
+  zIndex: number;
+  onActivate: () => void;
+  onHoverTrash: (hovering: boolean) => void;
+  onPlacementChange: (placement: ArtworkPlacement) => void;
+  onDelete: () => void;
+};
+
+function PlaceableArtwork({
+  artwork,
+  width,
+  height,
+  canvasHeight,
+  zIndex,
+  onActivate,
+  onHoverTrash,
+  onPlacementChange,
+  onDelete,
+}: PlaceableProps) {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedX = useSharedValue(0);
+  const savedY = useSharedValue(0);
+
+  const finishDrag = () => {
+    const nextX = artwork.placement.x + translateX.value;
+    const nextY = artwork.placement.y + translateY.value;
+
+    if (isOverTrashZone(nextX, nextY, width, height, 1, canvasHeight)) {
+      onHoverTrash(false);
+      onDelete();
+      return;
+    }
+
+    onHoverTrash(false);
+    onPlacementChange({
+      x: nextX,
+      y: nextY,
+      scale: 1,
+      rotation: 0,
+    });
+  };
+
+  const reportTrashHover = (tx: number, ty: number) => {
+    const hovering = isOverTrashZone(
+      artwork.placement.x + tx,
+      artwork.placement.y + ty,
+      width,
+      height,
+      1,
+      canvasHeight
+    );
+    onHoverTrash(hovering);
+  };
+
+  const drag = Gesture.Pan()
+    .onBegin(() => {
+      runOnJS(onActivate)();
+    })
+    .onUpdate((e) => {
+      translateX.value = savedX.value + e.translationX;
+      translateY.value = savedY.value + e.translationY;
+      runOnJS(reportTrashHover)(translateX.value, translateY.value);
+    })
+    .onEnd(() => {
+      savedX.value = translateX.value;
+      savedY.value = translateY.value;
+      runOnJS(finishDrag)();
+    });
+
+  const artworkStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={drag}>
+      <Animated.View
+        style={[
+          styles.artworkAnchor,
+          {
+            left: artwork.placement.x,
+            top: artwork.placement.y,
+            width,
+            height,
+            zIndex,
+          },
+          artworkStyle,
+        ]}
+      >
+        <View style={styles.artworkShadowBox}>
+          <Image
+            source={artwork.image ?? (artwork.uri ? { uri: artwork.uri } : undefined)}
+            style={styles.artworkImage}
+            resizeMode="cover"
+          />
+        </View>
+      </Animated.View>
+    </GestureDetector>
+  );
 }
 
 export default function PlaceScreen() {
   const router = useRouter();
   const {
     cleanedRoomUri,
-    artworkUri,
-    artworkSizeInches,
+    selectedArtworks,
+    setSelectedArtworks,
+    updateArtworkPlacement,
     wallEstimate,
     roomName,
-    setPlacement,
     setFinalImageUri,
   } = useAppStore();
 
   const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
   const roomAspectRatio = useImageAspectRatio(cleanedRoomUri);
   const canvasHeight = roomPreviewHeightForAspect(roomAspectRatio);
-
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const rotation = useSharedValue(0);
-  const savedX = useSharedValue(0);
-  const savedY = useSharedValue(0);
-  const savedScale = useSharedValue(1);
-  const savedRotation = useSharedValue(0);
-
-  const [artworkAspectRatio, setArtworkAspectRatio] = useState(DEFAULT_ARTWORK_ASPECT);
-
-  const trueScaleSize = useMemo(() => {
-    if (!artworkSizeInches) return null;
-    return trueScaleArtworkSize(artworkSizeInches, wall, CANVAS_WIDTH);
-  }, [artworkSizeInches, wall]);
-
-  const baseArtworkWidth = trueScaleSize?.width ?? ARTWORK_BASE_WIDTH;
-  const artworkHeight =
-    trueScaleSize?.height ?? baseArtworkWidth / artworkAspectRatio;
-
-  const savePlacement = () => {
-    setPlacement({
-      x: translateX.value,
-      y: translateY.value,
-      scale: scale.value,
-      rotation: rotation.value,
-    });
-  };
-
-  const applyPlacement = (placement: ArtworkPlacement) => {
-    translateX.value = placement.x;
-    translateY.value = placement.y;
-    scale.value = placement.scale;
-    rotation.value = placement.rotation;
-    savedX.value = placement.x;
-    savedY.value = placement.y;
-    savedScale.value = placement.scale;
-    savedRotation.value = placement.rotation;
-    setPlacement(placement);
-  };
-
-  const drag = Gesture.Pan()
-    .onUpdate((e) => {
-      translateX.value = savedX.value + e.translationX;
-      translateY.value = savedY.value + e.translationY;
-    })
-    .onEnd(() => {
-      savedX.value = translateX.value;
-      savedY.value = translateY.value;
-      runOnJS(savePlacement)();
-    });
-
-  const pinch = Gesture.Pinch()
-    .onUpdate((e) => {
-      scale.value = Math.max(0.2, Math.min(4, savedScale.value * e.scale));
-    })
-    .onEnd(() => {
-      savedScale.value = scale.value;
-      runOnJS(savePlacement)();
-    });
-
-  const rotate = Gesture.Rotation()
-    .onUpdate((e) => {
-      rotation.value = savedRotation.value + e.rotation;
-    })
-    .onEnd(() => {
-      savedRotation.value = rotation.value;
-      runOnJS(savePlacement)();
-    });
-
-  const combined = Gesture.Simultaneous(drag, pinch, rotate);
-
-  const artworkStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-      { rotate: `${rotation.value}rad` },
-    ],
-  }));
-
-  const resetPlacement = () => {
-    applyPlacement({ x: 0, y: 0, scale: 1, rotation: 0 });
-  };
-
-  const isSample = artworkUri?.startsWith('sample:');
-  const sampleId = isSample ? artworkUri?.split(':')[1] : null;
-  const sampleArtwork = sampleId
-    ? ALL_SAMPLE_ARTWORKS.find((item) => item.id === sampleId)
-    : null;
-  const sampleColor = sampleId ? SAMPLE_COLORS[sampleId] ?? '#888' : '#888';
   const backgroundUri = cleanedRoomUri || undefined;
   const previewRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
+  const [layoutEpoch, setLayoutEpoch] = useState(0);
+  const [trashActive, setTrashActive] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(
+    selectedArtworks[0]?.id ?? null
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  const sizedArtworks = useMemo(
+    () =>
+      selectedArtworks.map((artwork) => {
+        const size = trueScaleArtworkSize(artwork.sizeInches, wall, CANVAS_WIDTH);
+        return { artwork, ...size };
+      }),
+    [selectedArtworks, wall]
+  );
 
-    async function loadAspectRatio() {
-      if (artworkSizeInches) {
-        setArtworkAspectRatio(artworkSizeInches.widthInches / artworkSizeInches.heightInches);
-        return;
-      }
+  const removeArtwork = (id: string) => {
+    setSelectedArtworks(selectedArtworks.filter((item) => item.id !== id));
+    setActiveId((current) => (current === id ? null : current));
+    setTrashActive(false);
+    setLayoutEpoch((value) => value + 1);
+  };
 
-      if (!artworkUri) {
-        setArtworkAspectRatio(DEFAULT_ARTWORK_ASPECT);
-        return;
-      }
-
-      if (isSample && sampleArtwork) {
-        const parsed = parseDimensionsAspect(sampleArtwork.dimensions);
-        if (!cancelled) {
-          setArtworkAspectRatio(parsed ?? DEFAULT_ARTWORK_ASPECT);
-        }
-        return;
-      }
-
-      try {
-        const { width: imageWidth, height: imageHeight } = await getImageDimensions(artworkUri);
-        if (!cancelled && imageWidth > 0 && imageHeight > 0) {
-          setArtworkAspectRatio(imageWidth / imageHeight);
-        }
-      } catch {
-        if (!cancelled) {
-          setArtworkAspectRatio(DEFAULT_ARTWORK_ASPECT);
-        }
-      }
-    }
-
-    loadAspectRatio();
-    return () => {
-      cancelled = true;
-    };
-  }, [artworkUri, artworkSizeInches, isSample, sampleArtwork]);
+  const resetPlacement = () => {
+    const sizes = sizedArtworks.map(({ width, height }) => ({ width, height }));
+    const placements = layoutArtworksNonOverlapping(
+      sizes,
+      CANVAS_WIDTH,
+      canvasHeight,
+      wall
+    );
+    setSelectedArtworks(
+      selectedArtworks.map((artwork, index) => ({
+        ...artwork,
+        placement: placements[index] ?? { x: 0, y: 0, scale: 1, rotation: 0 },
+      }))
+    );
+    setLayoutEpoch((value) => value + 1);
+    setTrashActive(false);
+  };
 
   const handleSavePreview = async () => {
     if (!previewRef.current) return;
     setCapturing(true);
     try {
-      savePlacement();
       await new Promise((resolve) => setTimeout(resolve, 150));
       const uri = await captureRef(previewRef, {
         format: 'png',
@@ -235,52 +257,56 @@ export default function PlaceScreen() {
       <View style={styles.container}>
         <View style={styles.hintBar}>
           <Text style={styles.hintText}>
-            {artworkSizeInches
-              ? `True scale · Art ${formatInchesSize(artworkSizeInches)} on wall ~${formatInchesSize(wall)}`
-              : 'Drag · Pinch to resize · Two-finger rotate'}
+            Blank wall ~{formatInchesSize(wall)}
+            {wallEstimate ? '' : ' (default estimate)'}
+          </Text>
+          <Text style={styles.hintSubtext}>
+            Drag artworks to move · Drag to the trash to remove
           </Text>
         </View>
 
-        <View
-          ref={previewRef}
-          collapsable={false}
-          style={[styles.canvasWrapper, { height: canvasHeight }]}
-        >
-          <View style={styles.roomClip}>
-            {backgroundUri ? (
-              <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="contain" />
-            ) : (
-              <View style={[styles.canvas, styles.canvasPlaceholder]}>
-                <Text style={styles.canvasPlaceholderText}>Room preview</Text>
-              </View>
-            )}
+        <View style={[styles.canvasShell, { height: canvasHeight }]}>
+          <View
+            ref={previewRef}
+            collapsable={false}
+            style={styles.canvasWrapper}
+          >
+            <View style={styles.roomClip}>
+              {backgroundUri ? (
+                <Image source={{ uri: backgroundUri }} style={styles.canvas} resizeMode="contain" />
+              ) : (
+                <View style={[styles.canvas, styles.canvasPlaceholder]}>
+                  <Text style={styles.canvasPlaceholderText}>Room preview</Text>
+                </View>
+              )}
+            </View>
+
+            {sizedArtworks.map(({ artwork, width, height }, index) => (
+              <PlaceableArtwork
+                key={`${artwork.id}-${layoutEpoch}-${Math.round(artwork.placement.x)}-${Math.round(artwork.placement.y)}`}
+                artwork={artwork}
+                width={width}
+                height={height}
+                canvasHeight={canvasHeight}
+                zIndex={artwork.id === activeId ? 100 : index + 1}
+                onActivate={() => setActiveId(artwork.id)}
+                onHoverTrash={setTrashActive}
+                onPlacementChange={(placement) => updateArtworkPlacement(artwork.id, placement)}
+                onDelete={() => removeArtwork(artwork.id)}
+              />
+            ))}
           </View>
 
-          <GestureDetector gesture={combined}>
-            <View
-              style={[
-                styles.artworkAnchor,
-                {
-                  width: baseArtworkWidth,
-                  height: artworkHeight,
-                },
-              ]}
-            >
-              <Animated.View style={[styles.artworkInner, artworkStyle]}>
-                {isSample ? (
-                  <View style={[styles.artworkShadowBox, { backgroundColor: sampleColor }]} />
-                ) : artworkUri ? (
-                  <View style={styles.artworkShadowBox}>
-                    <Image
-                      source={{ uri: artworkUri }}
-                      style={styles.artworkImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                ) : null}
-              </Animated.View>
-            </View>
-          </GestureDetector>
+          <View
+            pointerEvents="none"
+            style={[styles.trashWrap, trashActive && styles.trashWrapActive]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={22}
+              color={trashActive ? Colors.error : Colors.textMuted}
+            />
+          </View>
         </View>
 
         <View style={styles.controls}>
@@ -292,7 +318,7 @@ export default function PlaceScreen() {
               label="Save Preview"
               onPress={handleSavePreview}
               loading={capturing}
-              disabled={capturing}
+              disabled={capturing || selectedArtworks.length === 0}
             />
           </View>
         </View>
@@ -321,11 +347,23 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: Typography.sizes.sm,
+    fontWeight: '600',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  hintSubtext: {
+    fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
     textAlign: 'center',
+    marginTop: 2,
+  },
+  canvasShell: {
+    width: '100%',
+    position: 'relative',
   },
   canvasWrapper: {
     width: '100%',
+    height: '100%',
     borderRadius: Radius.md,
     backgroundColor: Colors.surfaceMuted,
     position: 'relative',
@@ -348,14 +386,23 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
   },
+  trashWrap: {
+    position: 'absolute',
+    left: TRASH_PADDING,
+    bottom: TRASH_PADDING,
+    width: TRASH_SIZE,
+    height: TRASH_SIZE,
+    borderRadius: Radius.sm,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 200,
+  },
+  trashWrapActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
   artworkAnchor: {
     position: 'absolute',
-    top: `${PLACEMENT_ANCHOR_TOP * 100}%`,
-    left: `${PLACEMENT_ANCHOR_LEFT * 100}%`,
-  },
-  artworkInner: {
-    width: '100%',
-    height: '100%',
   },
   artworkShadowBox: {
     width: '100%',
