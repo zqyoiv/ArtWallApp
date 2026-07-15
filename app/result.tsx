@@ -44,14 +44,21 @@ export default function ResultScreen() {
         Alert.alert('Nothing to save', 'Go back and tap Save Preview on the placement screen.');
         return;
       }
-      await saveImageToCameraRoll(uri);
-      Alert.alert(
-        'Saved',
-        Platform.OS === 'web'
-          ? 'Your preview download has started.'
-          : 'Your preview was added to Photos.'
-      );
+      const result = await saveImageToCameraRoll(uri);
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          result === 'shared' ? 'Share sheet opened' : 'Download started',
+          result === 'shared'
+            ? 'In the share sheet, tap Save Image to add this preview to your Photos.'
+            : 'Check your browser downloads. On iPhone, use Share → Save Image to add it to Photos.'
+        );
+      } else {
+        Alert.alert('Saved', 'Your preview was added to Photos.');
+      }
     } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'SAVE_CANCELLED') {
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Could not save to Photos.';
       Alert.alert('Save Failed', message);
     } finally {
@@ -67,6 +74,20 @@ export default function ResultScreen() {
         Alert.alert('Nothing to share', 'Go back and tap Save Preview on the placement screen.');
         return;
       }
+
+      // Mobile web (especially iOS Safari): prefer sharing the image file directly.
+      if (Platform.OS === 'web') {
+        const result = await saveImageToCameraRoll(uri);
+        if (result === 'shared') {
+          return;
+        }
+        Alert.alert(
+          'Download started',
+          'Sharing is limited in this browser. The image was downloaded instead.'
+        );
+        return;
+      }
+
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
         return;
@@ -75,7 +96,10 @@ export default function ResultScreen() {
         mimeType: 'image/png',
         dialogTitle: 'Share your wall preview',
       });
-    } catch {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'SAVE_CANCELLED') {
+        return;
+      }
       // user cancelled or share failed silently
     } finally {
       setSharing(false);
@@ -115,7 +139,7 @@ export default function ResultScreen() {
         </View>
 
         <PrimaryButton
-          label="Save to Photos"
+          label={Platform.OS === 'web' ? 'Save Image' : 'Save to Photos'}
           onPress={handleSaveToLibrary}
           loading={saving}
           disabled={saving || sharing}

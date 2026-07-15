@@ -79,24 +79,56 @@ export default function ArtworkScreen() {
 
       if (prepared.length === 0) return;
 
-      const sizes = prepared.map(({ sizeInches }) =>
+      const previousById = new Map(selectedArtworks.map((item) => [item.id, item]));
+      const sameSelection =
+        prepared.length === selectedArtworks.length &&
+        prepared.every((item, index) => item.artwork.id === selectedArtworks[index]?.id);
+
+      // Selection unchanged — keep dragged positions and just return to the layout screen.
+      if (sameSelection && selectedArtworks.length > 0) {
+        router.push('/place');
+        return;
+      }
+
+      const newItems = prepared.filter((item) => !previousById.has(item.artwork.id));
+      const newSizes = newItems.map(({ sizeInches }) =>
         trueScaleArtworkSize(sizeInches, wall, canvasWidth)
       );
-      const placements = layoutArtworksNonOverlapping(
-        sizes,
-        canvasWidth,
-        canvasHeight,
-        wall
-      );
+      const newPlacements =
+        newItems.length > 0
+          ? layoutArtworksNonOverlapping(newSizes, canvasWidth, canvasHeight, wall)
+          : [];
 
-      const next: SelectedArtwork[] = prepared.map((item, index) => ({
-        id: item.artwork.id,
-        image: item.artwork.image,
-        uri: item.uri,
-        title: item.artwork.title,
-        sizeInches: item.sizeInches,
-        placement: placements[index] ?? { x: 0, y: 0, scale: 1, rotation: 0 },
-      }));
+      let newPlacementIndex = 0;
+      const next: SelectedArtwork[] = prepared.map((item) => {
+        const existing = previousById.get(item.artwork.id);
+        if (existing) {
+          return {
+            ...existing,
+            image: item.artwork.image,
+            uri: item.uri,
+            title: item.artwork.title,
+            sizeInches: item.sizeInches,
+          };
+        }
+
+        const placement = newPlacements[newPlacementIndex] ?? {
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+        };
+        newPlacementIndex += 1;
+
+        return {
+          id: item.artwork.id,
+          image: item.artwork.image,
+          uri: item.uri,
+          title: item.artwork.title,
+          sizeInches: item.sizeInches,
+          placement,
+        };
+      });
 
       setSelectedArtworks(next);
       router.push('/place');

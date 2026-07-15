@@ -200,30 +200,31 @@ export default function PlaceScreen() {
     [selectedArtworks, wall, canvasWidth]
   );
 
-  // Keep true-scale layout in sync when the fitted canvas size settles (common on web
-  // after image dimensions load) or the viewport changes.
+  // If the fitted canvas size changes (viewport / image aspect settle), scale existing
+  // placements — never re-pack, so user drag positions are preserved.
+  const lastCanvasRef = useRef({ width: 0, height: 0 });
   useEffect(() => {
     if (canvasWidth < 32 || canvasHeight < 32) return;
 
-    setSelectedArtworks((prev) => {
-      if (prev.length === 0) return prev;
-      const sizes = prev.map((artwork) => {
-        const size = trueScaleArtworkSize(artwork.sizeInches, wall, canvasWidth);
-        return { width: size.width, height: size.height };
-      });
-      const placements = layoutArtworksNonOverlapping(
-        sizes,
-        canvasWidth,
-        canvasHeight,
-        wall
-      );
-      return prev.map((artwork, index) => ({
+    const prev = lastCanvasRef.current;
+    lastCanvasRef.current = { width: canvasWidth, height: canvasHeight };
+
+    if (prev.width < 32 || prev.height < 32) return;
+    if (prev.width === canvasWidth && prev.height === canvasHeight) return;
+
+    const scaleX = canvasWidth / prev.width;
+    const scaleY = canvasHeight / prev.height;
+    setSelectedArtworks((arts) =>
+      arts.map((artwork) => ({
         ...artwork,
-        placement: placements[index] ?? artwork.placement,
-      }));
-    });
-    setLayoutEpoch((value) => value + 1);
-  }, [canvasWidth, canvasHeight, wall, setSelectedArtworks]);
+        placement: {
+          ...artwork.placement,
+          x: artwork.placement.x * scaleX,
+          y: artwork.placement.y * scaleY,
+        },
+      }))
+    );
+  }, [canvasWidth, canvasHeight, setSelectedArtworks]);
 
   const removeArtwork = (id: string) => {
     setSelectedArtworks(selectedArtworks.filter((item) => item.id !== id));

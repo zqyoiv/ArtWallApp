@@ -14,10 +14,14 @@ export async function ensurePhotoLibraryWriteAccess(): Promise<boolean> {
   return false;
 }
 
-export async function saveImageToCameraRoll(localUri: string): Promise<void> {
+/** Native: writes into the photo library. Web: share sheet or download (see .web.ts). */
+export async function saveImageToCameraRoll(
+  localUri: string
+): Promise<'saved' | 'shared' | 'downloaded'> {
   const allowed = await ensurePhotoLibraryWriteAccess();
   if (!allowed) {
-    return;
+    throw new Error('SAVE_CANCELLED');
   }
   await MediaLibrary.saveToLibraryAsync(localUri);
+  return 'saved';
 }
