@@ -1,0 +1,7 @@
+{
+  "target": "full",
+  "targets": {
+    "full": "Web + iOS (all Expo native modules)",
+    "web": "Web-only (lighter install for Render / static hosting)"
+  }
+}

@@ -3,15 +3,19 @@
 // Blank-wall dimension estimates using OpenAI Vision
 
 import { Platform } from 'react-native';
-import { uriToDataUrl } from './imageUtils';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { getImageDimensions, uriToDataUrl } from './imageUtils';
 import { normalizeImageForOpenAI } from './normalizeImage';
 import { parseWallEstimate, WallEstimate } from './dimensions';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/images/edits';
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
-/** Landscape output size for gpt-image-1. `auto` preserves the source aspect ratio. */
-const CLEANUP_IMAGE_SIZE = 'auto';
+/**
+ * gpt-image-1 only allows these sizes. `auto` lets the model pick and often
+ * defaults to square — never use it when we need to match the room photo.
+ */
+type GptImage1Size = '1024x1024' | '1536x1024' | '1024x1536';
 
 const CLEANUP_PROMPT = `Remove all clutter, loose objects, cables, boxes, and miscellaneous household items from this room.
 Also remove every item on the walls: paintings, framed art, posters, prints, wall decor, mirrors, shelves with objects, and any other wall-mounted visuals.
@@ -22,6 +26,51 @@ Keep the original camera framing and aspect ratio — do not crop, stretch, lett
 Return a clean, realistic version of the same space with bare walls ready for new artwork.`;
 
 type ImageMime = { mime: string; ext: string };
+
+/** Pick the gpt-image-1 size closest to the source photo's aspect ratio. */
+export function gptImage1SizeForAspect(aspectRatio: number): GptImage1Size {
+  // Midpoints between 1:1 (1.0), 3:2 landscape (1.5), and 2:3 portrait (~0.667).
+  if (aspectRatio >= 1.25) return '1536x1024';
+  if (aspectRatio <= 0.8) return '1024x1536';
+  return '1024x1024';
+}
+
+/** Center-crop so the result matches the source photo's aspect ratio. */
+async function matchSourceAspect(imageUri: string, targetAspect: number): Promise<string> {
+  const { width, height } = await getImageDimensions(imageUri);
+  if (width <= 0 || height <= 0) return imageUri;
+
+  const currentAspect = width / height;
+  if (Math.abs(currentAspect - targetAspect) < 0.02) {
+    return imageUri;
+  }
+
+  let crop: { originX: number; originY: number; width: number; height: number };
+  if (currentAspect > targetAspect) {
+    const cropWidth = Math.round(height * targetAspect);
+    crop = {
+      originX: Math.max(0, Math.round((width - cropWidth) / 2)),
+      originY: 0,
+      width: Math.min(cropWidth, width),
+      height,
+    };
+  } else {
+    const cropHeight = Math.round(width / targetAspect);
+    crop = {
+      originX: 0,
+      originY: Math.max(0, Math.round((height - cropHeight) / 2)),
+      width,
+      height: Math.min(cropHeight, height),
+    };
+  }
+
+  const result = await ImageManipulator.manipulateAsync(
+    imageUri,
+    [{ crop }],
+    { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return result.uri;
+}
 
 function guessMimeFromUri(uri: string): ImageMime {
   const lower = uri.split('?')[0].toLowerCase();
@@ -62,9 +111,11 @@ async function appendWebImage(formData: FormData, source: string) {
   formData.append('image', blob, `room.${ext}`);
 }
 
-async function buildCleanupFormData(imageSource: string): Promise<FormData> {
+async function buildCleanupFormData(
+  normalizedSource: string,
+  size: GptImage1Size
+): Promise<FormData> {
   const formData = new FormData();
-  const normalizedSource = await normalizeImageForOpenAI(imageSource);
 
   if (Platform.OS === 'web') {
     await appendWebImage(formData, normalizedSource);
@@ -75,7 +126,7 @@ async function buildCleanupFormData(imageSource: string): Promise<FormData> {
   formData.append('prompt', CLEANUP_PROMPT);
   formData.append('model', 'gpt-image-1');
   formData.append('n', '1');
-  formData.append('size', CLEANUP_IMAGE_SIZE);
+  formData.append('size', size);
 
   return formData;
 }
@@ -87,7 +138,12 @@ export async function cleanupRoomImage(
   imageSource: string,
   apiKey: string
 ): Promise<string> {
-  const formData = await buildCleanupFormData(imageSource);
+  const normalizedSource = await normalizeImageForOpenAI(imageSource);
+  const { width, height } = await getImageDimensions(normalizedSource);
+  const sourceAspect = width > 0 && height > 0 ? width / height : 16 / 9;
+  const size = gptImage1SizeForAspect(sourceAspect);
+
+  const formData = await buildCleanupFormData(normalizedSource, size);
 
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -106,12 +162,14 @@ export async function cleanupRoomImage(
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) throw new Error('No image returned from API');
 
-  return `data:image/png;base64,${b64}`;
+  const generated = `data:image/png;base64,${b64}`;
+  // API sizes are fixed; crop back so placement uses the same framing as the room photo.
+  return matchSourceAspect(generated, sourceAspect);
 }
 
 const WALL_DIMENSION_PROMPT = `You are an interior measurement assistant. Look at this room photo and estimate the blank wall area suitable for hanging artwork — typically the open wall space above a sofa, bed, console, or other furniture on the main background wall.
 
-Return a realistic inch estimate (approximate is fine) for that blank wall rectangle, plus where it sits in the 16:9 photo.
+Return a realistic inch estimate (approximate is fine) for that blank wall rectangle, plus where it sits in the photo.
 
 Respond with JSON only:
 {

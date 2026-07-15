@@ -6,6 +6,7 @@ import {
   Image,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -49,7 +50,12 @@ export default function ResultScreen() {
         return;
       }
       await saveImageToCameraRoll(uri);
-      Alert.alert('Saved', 'Your preview was added to Photos.');
+      Alert.alert(
+        'Saved',
+        Platform.OS === 'web'
+          ? 'Your preview download has started.'
+          : 'Your preview was added to Photos.'
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not save to Photos.';
       Alert.alert('Save Failed', message);
