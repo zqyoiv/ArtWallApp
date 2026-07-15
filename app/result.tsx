@@ -16,11 +16,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Spacing } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 import { saveImageToCameraRoll } from '../utils/saveToLibrary';
-import {
-  ROOM_PREVIEW_WIDTH,
-  roomPreviewHeightForAspect,
-  useImageAspectRatio,
-} from '../utils/useImageAspectRatio';
+import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -28,8 +24,7 @@ export default function ResultScreen() {
   const previewRef = useRef<View>(null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const previewAspect = useImageAspectRatio(finalImageUri);
-  const previewHeight = roomPreviewHeightForAspect(previewAspect, ROOM_PREVIEW_WIDTH);
+  const { width: previewWidth, height: previewHeight } = useRoomPreviewLayout(finalImageUri);
 
   const resolveCaptureUri = async (): Promise<string | null> => {
     if (finalImageUri) {
@@ -114,7 +109,7 @@ export default function ResultScreen() {
         <View
           ref={previewRef}
           collapsable={false}
-          style={[styles.previewBox, { height: previewHeight }]}
+          style={[styles.previewBox, { width: previewWidth, height: previewHeight }]}
         >
           <Image source={{ uri: finalImageUri }} style={styles.previewImage} resizeMode="contain" />
         </View>
@@ -154,7 +149,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   previewBox: {
-    width: '100%',
+    alignSelf: 'center',
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,

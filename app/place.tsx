@@ -1,5 +1,5 @@
 // app/place.tsx — arrange one or more artworks on the cleaned room wall
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -36,13 +36,8 @@ import {
   layoutArtworksNonOverlapping,
   trueScaleArtworkSize,
 } from '../utils/placementLayout';
-import {
-  ROOM_PREVIEW_WIDTH,
-  roomPreviewHeightForAspect,
-  useImageAspectRatio,
-} from '../utils/useImageAspectRatio';
+import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
 
-const CANVAS_WIDTH = ROOM_PREVIEW_WIDTH;
 const TRASH_SIZE = 44;
 const TRASH_PADDING = 10;
 /** Hit area around the trash icon for delete-on-drop. */
@@ -186,8 +181,7 @@ export default function PlaceScreen() {
   } = useAppStore();
 
   const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
-  const roomAspectRatio = useImageAspectRatio(cleanedRoomUri);
-  const canvasHeight = roomPreviewHeightForAspect(roomAspectRatio);
+  const { width: canvasWidth, height: canvasHeight } = useRoomPreviewLayout(cleanedRoomUri);
   const backgroundUri = cleanedRoomUri || undefined;
   const previewRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
@@ -200,11 +194,36 @@ export default function PlaceScreen() {
   const sizedArtworks = useMemo(
     () =>
       selectedArtworks.map((artwork) => {
-        const size = trueScaleArtworkSize(artwork.sizeInches, wall, CANVAS_WIDTH);
+        const size = trueScaleArtworkSize(artwork.sizeInches, wall, canvasWidth);
         return { artwork, ...size };
       }),
-    [selectedArtworks, wall]
+    [selectedArtworks, wall, canvasWidth]
   );
+
+  // Keep true-scale layout in sync when the fitted canvas size settles (common on web
+  // after image dimensions load) or the viewport changes.
+  useEffect(() => {
+    if (canvasWidth < 32 || canvasHeight < 32) return;
+
+    setSelectedArtworks((prev) => {
+      if (prev.length === 0) return prev;
+      const sizes = prev.map((artwork) => {
+        const size = trueScaleArtworkSize(artwork.sizeInches, wall, canvasWidth);
+        return { width: size.width, height: size.height };
+      });
+      const placements = layoutArtworksNonOverlapping(
+        sizes,
+        canvasWidth,
+        canvasHeight,
+        wall
+      );
+      return prev.map((artwork, index) => ({
+        ...artwork,
+        placement: placements[index] ?? artwork.placement,
+      }));
+    });
+    setLayoutEpoch((value) => value + 1);
+  }, [canvasWidth, canvasHeight, wall, setSelectedArtworks]);
 
   const removeArtwork = (id: string) => {
     setSelectedArtworks(selectedArtworks.filter((item) => item.id !== id));
@@ -217,7 +236,7 @@ export default function PlaceScreen() {
     const sizes = sizedArtworks.map(({ width, height }) => ({ width, height }));
     const placements = layoutArtworksNonOverlapping(
       sizes,
-      CANVAS_WIDTH,
+      canvasWidth,
       canvasHeight,
       wall
     );
@@ -265,7 +284,7 @@ export default function PlaceScreen() {
           </Text>
         </View>
 
-        <View style={[styles.canvasShell, { height: canvasHeight }]}>
+        <View style={[styles.canvasShell, { width: canvasWidth, height: canvasHeight }]}>
           <View
             ref={previewRef}
             collapsable={false}
@@ -358,7 +377,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   canvasShell: {
-    width: '100%',
+    alignSelf: 'center',
     position: 'relative',
   },
   canvasWrapper: {

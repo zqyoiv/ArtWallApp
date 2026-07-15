@@ -19,11 +19,7 @@ import { useAppStore } from '../utils/store';
 import { normalizeImageForOpenAI } from '../utils/normalizeImage';
 import { DEBUG_WALL_ESTIMATE } from '../utils/dimensions';
 import { resolveAssetUri } from '../utils/imageUtils';
-import {
-  ROOM_PREVIEW_WIDTH,
-  roomPreviewHeightForAspect,
-  useImageAspectRatio,
-} from '../utils/useImageAspectRatio';
+import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
 
 const DEBUG_ROOM_SOURCE = require('../assets/test-room/02_couch_cleaned.jpg');
 
@@ -32,8 +28,7 @@ export default function CaptureScreen() {
   const { debugMode, setRoomImageUri, setCleanedRoomUri, setWallEstimate } = useAppStore();
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [processingImage, setProcessingImage] = useState(false);
-  const previewAspect = useImageAspectRatio(previewUri);
-  const previewHeight = roomPreviewHeightForAspect(previewAspect, ROOM_PREVIEW_WIDTH);
+  const { width: previewWidth, height: previewHeight } = useRoomPreviewLayout(previewUri);
 
   const applyPickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setProcessingImage(true);
@@ -153,7 +148,7 @@ export default function CaptureScreen() {
           </View>
         )}
 
-        <View style={[styles.previewContainer, { height: previewHeight }]}>
+        <View style={[styles.previewContainer, { width: previewWidth, height: previewHeight }]}>
           {processingImage ? (
             <View style={styles.previewPlaceholder}>
               <ActivityIndicator size="large" color={Colors.textMuted} />
@@ -234,7 +229,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   previewContainer: {
-    width: '100%',
+    alignSelf: 'center',
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: Colors.surfaceMuted,

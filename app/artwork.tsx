@@ -25,11 +25,7 @@ import {
   layoutArtworksNonOverlapping,
   trueScaleArtworkSize,
 } from '../utils/placementLayout';
-import {
-  ROOM_PREVIEW_WIDTH,
-  roomPreviewHeightForAspect,
-  useImageAspectRatio,
-} from '../utils/useImageAspectRatio';
+import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
 import { resolveAssetUri } from '../utils/imageUtils';
 
 export default function ArtworkScreen() {
@@ -44,8 +40,7 @@ export default function ArtworkScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [designing, setDesigning] = useState(false);
 
-  const roomAspect = useImageAspectRatio(cleanedRoomUri);
-  const canvasHeight = roomPreviewHeightForAspect(roomAspect);
+  const { width: canvasWidth, height: canvasHeight } = useRoomPreviewLayout(cleanedRoomUri);
   const wall = wallEstimate ?? DEFAULT_WALL_ESTIMATE;
 
   useFocusEffect(
@@ -85,11 +80,11 @@ export default function ArtworkScreen() {
       if (prepared.length === 0) return;
 
       const sizes = prepared.map(({ sizeInches }) =>
-        trueScaleArtworkSize(sizeInches, wall, ROOM_PREVIEW_WIDTH)
+        trueScaleArtworkSize(sizeInches, wall, canvasWidth)
       );
       const placements = layoutArtworksNonOverlapping(
         sizes,
-        ROOM_PREVIEW_WIDTH,
+        canvasWidth,
         canvasHeight,
         wall
       );

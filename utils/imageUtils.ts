@@ -30,7 +30,35 @@ export async function uriToDataUrl(uri: string): Promise<string> {
   return `data:${mime};base64,${base64}`;
 }
 
-export function getImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+function getWebImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const HtmlImage = typeof window !== 'undefined' ? window.Image : null;
+    if (!HtmlImage) {
+      reject(new Error('HTML Image unavailable'));
+      return;
+    }
+    const img = new HtmlImage();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      } else {
+        reject(new Error('Could not read image dimensions'));
+      }
+    };
+    img.onerror = () => reject(new Error('Could not load image for dimensions'));
+    img.src = uri;
+  });
+}
+
+export async function getImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+  if (Platform.OS === 'web') {
+    try {
+      return await getWebImageDimensions(uri);
+    } catch {
+      // Fall through to RN Image.getSize when possible.
+    }
+  }
+
   return new Promise((resolve, reject) => {
     Image.getSize(
       uri,
