@@ -30,6 +30,10 @@
         "WRITE_EXTERNAL_STORAGE"
       ]
     },
+    "web": {
+      "output": "static",
+      "bundler": "metro"
+    },
     "plugins": [
       "expo-router",
       "expo-camera",
