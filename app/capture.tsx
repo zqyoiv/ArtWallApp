@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -59,7 +60,7 @@ export default function CaptureScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 0.92,
+      quality: 1,
       allowsEditing: false,
       preferredAssetRepresentationMode:
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
@@ -77,7 +78,7 @@ export default function CaptureScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.92,
+      quality: 1,
       allowsEditing: false,
       preferredAssetRepresentationMode:
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
@@ -119,20 +120,19 @@ export default function CaptureScreen() {
     <View style={styles.screen}>
       <ScreenHeader title="Capture Room" />
 
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {debugMode ? (
-          <View style={styles.debugBox}>
-            <Text style={styles.debugTitle}>Debug mode</Text>
-            <Text style={styles.debugDesc}>
-              Use the built-in cleaned test room and skip AI cleanup.
-            </Text>
-            <PrimaryButton
-              label="Use Debug Room"
-              onPress={useDebugRoom}
-              loading={processingImage}
-              disabled={processingImage}
-            />
-          </View>
+          <PrimaryButton
+            label="Use Debug Room"
+            onPress={useDebugRoom}
+            loading={processingImage}
+            disabled={processingImage}
+          />
         ) : (
           <View style={styles.tipsBox}>
             <Text style={styles.tipsTitle}>For best results</Text>
@@ -177,10 +177,14 @@ export default function CaptureScreen() {
             <Text style={styles.actionLabel}>Gallery</Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
 
-        {previewUri && !processingImage && (
-          <PrimaryButton label="Continue" onPress={handleContinue} />
-        )}
+      <View style={styles.footer}>
+        <PrimaryButton
+          label="Continue"
+          onPress={handleContinue}
+          disabled={!previewUri || processingImage}
+        />
       </View>
     </View>
   );
@@ -191,31 +195,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  container: {
+  scroll: {
     flex: 1,
-    padding: Spacing.lg,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     gap: Spacing.lg,
+  },
+  footer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderLight,
+    backgroundColor: Colors.background,
   },
   tipsBox: {
     backgroundColor: Colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.md,
-  },
-  debugBox: {
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    gap: Spacing.sm,
-  },
-  debugTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  debugDesc: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    lineHeight: 22,
   },
   tipsTitle: {
     fontSize: Typography.sizes.sm,

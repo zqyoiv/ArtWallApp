@@ -38,9 +38,10 @@ import {
 } from '../utils/placementLayout';
 import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
 import { captureViewToDataUri } from '../utils/captureView';
+import { composePreviewImage } from '../utils/composePreview';
+import { getImageDimensions } from '../utils/imageUtils';
 import {
   canShareImageFile,
-  dataUriToImageFile,
   isWebShareAvailable,
 } from '../utils/webShareImage';
 import { WebShareButton } from '../components/WebShareButton';
@@ -179,6 +180,7 @@ export default function PlaceScreen() {
   const router = useRouter();
   const {
     cleanedRoomUri,
+    roomImageUri,
     selectedArtworks,
     setSelectedArtworks,
     updateArtworkPlacement,
@@ -192,12 +194,13 @@ export default function PlaceScreen() {
   const backgroundUri = cleanedRoomUri || undefined;
   const previewRef = useRef<View>(null);
   const preparedUriRef = useRef<string | null>(null);
-  const preparedFileRef = useRef<Awaited<ReturnType<typeof dataUriToImageFile>> | null>(null);
+  const preparedFileRef = useRef<File | null>(null);
   const prepGenerationRef = useRef(0);
   const [capturing, setCapturing] = useState(false);
-  const [shareFile, setShareFile] = useState<Awaited<
-    ReturnType<typeof dataUriToImageFile>
-  > | null>(null);
+  const [shareFile, setShareFile] = useState<File | null>(null);
+  const [exportSize, setExportSize] = useState<{ width: number; height: number } | null>(
+    null
+  );
   const [layoutEpoch, setLayoutEpoch] = useState(0);
   const [trashActive, setTrashActive] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(
@@ -225,14 +228,19 @@ export default function PlaceScreen() {
   );
 
   /**
-   * iOS Safari only opens the share sheet inside a real click — not after async capture.
-   * So we prepare the image in the background while the user arranges artworks.
-   * One tap on Save Image then calls share() immediately (no second tap).
+   * Build a full-resolution composite (room photo pixels + artwork assets),
+   * not a screenshot of the small on-screen preview.
+   * Prepared in the background so Save Image can open the share sheet on one tap.
    */
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (!isWebShareAvailable()) return;
-    if (selectedArtworks.length === 0 || canvasWidth < 32 || canvasHeight < 32) {
+    if (
+      !cleanedRoomUri ||
+      selectedArtworks.length === 0 ||
+      canvasWidth < 32 ||
+      canvasHeight < 32
+    ) {
       setShareFile(null);
       preparedFileRef.current = null;
       preparedUriRef.current = null;
@@ -241,18 +249,52 @@ export default function PlaceScreen() {
 
     const generation = ++prepGenerationRef.current;
     setShareFile(null);
+    setExportSize(null);
     preparedFileRef.current = null;
+    if (preparedUriRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(preparedUriRef.current);
+    }
+    preparedUriRef.current = null;
+
+    const artworksSnapshot = selectedArtworks.map((artwork) => ({
+      image: artwork.image,
+      uri: artwork.uri,
+      sizeInches: artwork.sizeInches,
+      placement: { ...artwork.placement },
+    }));
+    const originalUri = roomImageUri;
 
     const timer = setTimeout(() => {
-      if (!previewRef.current) return;
-      captureViewToDataUri(previewRef, { format: 'png', quality: 1 })
-        .then((uri) => dataUriToImageFile(uri).then((file) => ({ uri, file })))
-        .then(({ uri, file }) => {
-          if (generation !== prepGenerationRef.current) return;
-          if (!canShareImageFile(file)) return;
+      const targetDims =
+        originalUri && originalUri !== cleanedRoomUri
+          ? getImageDimensions(originalUri).catch(() => null)
+          : Promise.resolve(null);
+
+      targetDims
+        .then((dims) =>
+          composePreviewImage({
+            roomUri: cleanedRoomUri,
+            canvasWidth,
+            canvasHeight,
+            wall,
+            artworks: artworksSnapshot,
+            targetWidth: dims?.width,
+            targetHeight: dims?.height,
+          })
+        )
+        .then(({ uri, file, width, height }) => {
+          if (generation !== prepGenerationRef.current) {
+            if (uri.startsWith('blob:')) URL.revokeObjectURL(uri);
+            return;
+          }
+          if (!canShareImageFile(file)) {
+            if (uri.startsWith('blob:')) URL.revokeObjectURL(uri);
+            return;
+          }
           preparedUriRef.current = uri;
           preparedFileRef.current = file;
           setShareFile(file);
+          setExportSize({ width, height });
         })
         .catch(() => {
           // Keep button disabled until a later successful prep.
@@ -266,7 +308,9 @@ export default function PlaceScreen() {
     canvasHeight,
     layoutEpoch,
     cleanedRoomUri,
-    selectedArtworks.length,
+    roomImageUri,
+    selectedArtworks,
+    wall,
   ]);
 
   // If the fitted canvas size changes (viewport / image aspect settle), scale existing
@@ -365,10 +409,12 @@ export default function PlaceScreen() {
               ? !isWebShareAvailable()
                 ? 'Share needs https:// (use tunnel or Render)'
                 : shareFile
-                  ? 'Tap Save Image to open the iOS share menu'
+                  ? exportSize
+                    ? `Tap Save Image · export ${exportSize.width}×${exportSize.height}px`
+                    : 'Tap Save Image to save a full-resolution composite'
                   : selectedArtworks.length === 0
                     ? 'Drag artworks to move · Drag to the trash to remove'
-                    : 'Getting preview ready…'
+                    : 'Building full-resolution image…'
               : 'Drag artworks to move · Drag to the trash to remove'}
           </Text>
         </View>

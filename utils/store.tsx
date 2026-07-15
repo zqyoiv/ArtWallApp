@@ -1,5 +1,5 @@
 // utils/store.tsx
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useState, ReactNode } from 'react';
 import { ImageSourcePropType } from 'react-native';
 import { SizeInches, WallEstimate } from './dimensions';
 
@@ -57,22 +57,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [cleanedRoomUri, setCleanedRoomUri] = useState<string | null>(null);
   const [wallEstimate, setWallEstimate] = useState<WallEstimate | null>(null);
   const [selectedArtworks, setSelectedArtworks] = useState<SelectedArtwork[]>([]);
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(true);
   const [finalImageUri, setFinalImageUri] = useState<string | null>(null);
 
-  const updateArtworkPlacement = (id: string, placement: ArtworkPlacement) => {
+  const updateArtworkPlacement = useCallback((id: string, placement: ArtworkPlacement) => {
     setSelectedArtworks((prev) =>
       prev.map((item) => (item.id === id ? { ...item, placement } : item))
     );
-  };
+  }, []);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setRoomImageUri(null);
     setCleanedRoomUri(null);
     setWallEstimate(null);
     setSelectedArtworks([]);
     setFinalImageUri(null);
-  };
+  }, []);
 
   return (
     <AppContext.Provider

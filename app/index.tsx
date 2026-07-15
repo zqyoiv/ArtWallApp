@@ -1,4 +1,5 @@
 // app/index.tsx
+import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,12 +7,13 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { hasOpenAIApiKey } from '../utils/config';
+import { useAppStore } from '../utils/store';
 
 const STEPS = [
   { num: '01', label: 'Capture room', desc: 'Photo or camera' },
@@ -23,7 +25,14 @@ const STEPS = [
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { reset } = useAppStore();
 
+  // Every visit to the home screen starts a fresh session (no leftover selections).
+  useFocusEffect(
+    useCallback(() => {
+      reset();
+    }, [reset])
+  );
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
