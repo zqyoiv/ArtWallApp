@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { captureRef } from 'react-native-view-shot';
@@ -335,7 +336,7 @@ export default function PlaceScreen() {
           </TouchableOpacity>
           <View style={styles.saveWrap}>
             <PrimaryButton
-              label="Save Preview"
+              label={Platform.OS === 'web' ? 'Continue to Save' : 'Save Preview'}
               onPress={handleSavePreview}
               loading={capturing}
               disabled={capturing || selectedArtworks.length === 0}
