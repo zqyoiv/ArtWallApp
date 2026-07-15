@@ -5,9 +5,9 @@
 
 import {
   canShareImageFile,
+  dataUriToImageFile,
   downloadImageFile,
-  shareImageFile,
-  uriToImageFile,
+  shareImageFileNow,
 } from './webShareImage';
 
 export async function ensurePhotoLibraryWriteAccess(): Promise<boolean> {
@@ -21,9 +21,9 @@ export async function saveImageToCameraRoll(
     throw new Error('Saving is only available in a browser.');
   }
 
-  const file = await uriToImageFile(localUri);
+  const file = await dataUriToImageFile(localUri);
   if (canShareImageFile(file)) {
-    await shareImageFile(file);
+    await shareImageFileNow(file);
     return 'shared';
   }
 
@@ -31,12 +31,11 @@ export async function saveImageToCameraRoll(
   return 'downloaded';
 }
 
-/** Share a prebuilt file immediately (keeps the iOS user-gesture chain intact). */
 export async function savePreparedImageFile(
   file: File
 ): Promise<'shared' | 'downloaded'> {
   if (canShareImageFile(file)) {
-    await shareImageFile(file);
+    await shareImageFileNow(file);
     return 'shared';
   }
   await downloadImageFile(file);

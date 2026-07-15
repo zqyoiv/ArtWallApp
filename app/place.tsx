@@ -10,7 +10,6 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { captureRef } from 'react-native-view-shot';
 import { Ionicons } from '@expo/vector-icons';
 import {
   GestureDetector,
@@ -38,6 +37,13 @@ import {
   trueScaleArtworkSize,
 } from '../utils/placementLayout';
 import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
+import { captureViewToDataUri } from '../utils/captureView';
+import {
+  canShareImageFile,
+  dataUriToImageFile,
+  isWebShareAvailable,
+} from '../utils/webShareImage';
+import { WebShareButton } from '../components/WebShareButton';
 
 const TRASH_SIZE = 44;
 const TRASH_PADDING = 10;
@@ -185,7 +191,13 @@ export default function PlaceScreen() {
   const { width: canvasWidth, height: canvasHeight } = useRoomPreviewLayout(cleanedRoomUri);
   const backgroundUri = cleanedRoomUri || undefined;
   const previewRef = useRef<View>(null);
+  const preparedUriRef = useRef<string | null>(null);
+  const preparedFileRef = useRef<Awaited<ReturnType<typeof dataUriToImageFile>> | null>(null);
+  const prepGenerationRef = useRef(0);
   const [capturing, setCapturing] = useState(false);
+  const [shareFile, setShareFile] = useState<Awaited<
+    ReturnType<typeof dataUriToImageFile>
+  > | null>(null);
   const [layoutEpoch, setLayoutEpoch] = useState(0);
   const [trashActive, setTrashActive] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(
@@ -200,6 +212,62 @@ export default function PlaceScreen() {
       }),
     [selectedArtworks, wall, canvasWidth]
   );
+
+  const placementFingerprint = useMemo(
+    () =>
+      selectedArtworks
+        .map(
+          (a) =>
+            `${a.id}:${Math.round(a.placement.x)}:${Math.round(a.placement.y)}`
+        )
+        .join('|'),
+    [selectedArtworks]
+  );
+
+  /**
+   * iOS Safari only opens the share sheet inside a real click — not after async capture.
+   * So we prepare the image in the background while the user arranges artworks.
+   * One tap on Save Image then calls share() immediately (no second tap).
+   */
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!isWebShareAvailable()) return;
+    if (selectedArtworks.length === 0 || canvasWidth < 32 || canvasHeight < 32) {
+      setShareFile(null);
+      preparedFileRef.current = null;
+      preparedUriRef.current = null;
+      return;
+    }
+
+    const generation = ++prepGenerationRef.current;
+    setShareFile(null);
+    preparedFileRef.current = null;
+
+    const timer = setTimeout(() => {
+      if (!previewRef.current) return;
+      captureViewToDataUri(previewRef, { format: 'png', quality: 1 })
+        .then((uri) => dataUriToImageFile(uri).then((file) => ({ uri, file })))
+        .then(({ uri, file }) => {
+          if (generation !== prepGenerationRef.current) return;
+          if (!canShareImageFile(file)) return;
+          preparedUriRef.current = uri;
+          preparedFileRef.current = file;
+          setShareFile(file);
+        })
+        .catch(() => {
+          // Keep button disabled until a later successful prep.
+        });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [
+    placementFingerprint,
+    canvasWidth,
+    canvasHeight,
+    layoutEpoch,
+    cleanedRoomUri,
+    selectedArtworks.length,
+  ]);
 
   // If the fitted canvas size changes (viewport / image aspect settle), scale existing
   // placements — never re-pack, so user drag positions are preserved.
@@ -252,23 +320,34 @@ export default function PlaceScreen() {
     setTrashActive(false);
   };
 
-  const handleSavePreview = async () => {
-    if (!previewRef.current) return;
-    setCapturing(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const uri = await captureRef(previewRef, {
-        format: 'png',
-        quality: 1,
-      });
-      setFinalImageUri(uri);
-      router.push('/result');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not capture preview.';
-      Alert.alert('Capture Failed', message);
-    } finally {
-      setCapturing(false);
+  const handleWebShared = () => {
+    if (preparedUriRef.current) {
+      setFinalImageUri(preparedUriRef.current);
     }
+    // Refresh snapshot for a possible second share.
+    prepGenerationRef.current += 1;
+    setShareFile(null);
+    preparedFileRef.current = null;
+    // Trigger re-prep by bumping layoutEpoch lightly without moving art.
+    setLayoutEpoch((value) => value + 1);
+  };
+
+  const handleSavePreview = () => {
+    if (!previewRef.current || selectedArtworks.length === 0) return;
+
+    setCapturing(true);
+    Promise.resolve()
+      .then(() => new Promise((resolve) => setTimeout(resolve, 150)))
+      .then(() => captureViewToDataUri(previewRef, { format: 'png', quality: 1 }))
+      .then((uri) => {
+        setFinalImageUri(uri);
+        router.push('/result');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Could not capture preview.';
+        Alert.alert('Capture Failed', message);
+      })
+      .finally(() => setCapturing(false));
   };
 
   return (
@@ -282,7 +361,15 @@ export default function PlaceScreen() {
             {wallEstimate ? '' : ' (default estimate)'}
           </Text>
           <Text style={styles.hintSubtext}>
-            Drag artworks to move · Drag to the trash to remove
+            {Platform.OS === 'web'
+              ? !isWebShareAvailable()
+                ? 'Share needs https:// (use tunnel or Render)'
+                : shareFile
+                  ? 'Tap Save Image to open the iOS share menu'
+                  : selectedArtworks.length === 0
+                    ? 'Drag artworks to move · Drag to the trash to remove'
+                    : 'Getting preview ready…'
+              : 'Drag artworks to move · Drag to the trash to remove'}
           </Text>
         </View>
 
@@ -335,12 +422,25 @@ export default function PlaceScreen() {
             <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
           <View style={styles.saveWrap}>
-            <PrimaryButton
-              label={Platform.OS === 'web' ? 'Continue to Save' : 'Save Preview'}
-              onPress={handleSavePreview}
-              loading={capturing}
-              disabled={capturing || selectedArtworks.length === 0}
-            />
+            {Platform.OS === 'web' ? (
+              <WebShareButton
+                file={shareFile}
+                label="Save Image"
+                disabled={!shareFile}
+                onShared={handleWebShared}
+                onCancelled={handleWebShared}
+                onError={(message) => {
+                  Alert.alert('Share unavailable', message);
+                }}
+              />
+            ) : (
+              <PrimaryButton
+                label="Save Preview"
+                onPress={handleSavePreview}
+                loading={capturing}
+                disabled={capturing || selectedArtworks.length === 0}
+              />
+            )}
           </View>
         </View>
       </View>

@@ -11,13 +11,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { captureRef } from 'react-native-view-shot';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { useAppStore } from '../utils/store';
 import { saveImageToCameraRoll } from '../utils/saveToLibrary';
 import { useRoomPreviewLayout } from '../utils/useImageAspectRatio';
+import { captureViewToDataUri } from '../utils/captureView';
 import {
   canShareImageFile,
   shareImageFile,
@@ -70,7 +70,7 @@ export default function ResultScreen() {
     if (!previewRef.current) {
       return null;
     }
-    return captureRef(previewRef, { format: 'png', quality: 1 });
+    return captureViewToDataUri(previewRef, { format: 'png', quality: 1 });
   };
 
   const sharePreparedOrUri = async (uri: string | null): Promise<'shared' | 'downloaded'> => {
